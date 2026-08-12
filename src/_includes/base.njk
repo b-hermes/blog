@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title or site.name }}</title>
+  <meta name="description" content="{{ description or site.description }}">
+  <meta property="og:title" content="{{ ogtitle or title or site.name }}">
+  <meta property="og:description" content="{{ description or site.description }}">
+  <meta property="og:image" content="{{ site.url }}/og.png">
+  <meta property="og:url" content="{{ site.url }}{{ page.url }}">
+  <meta property="og:type" content="{{ ogtype or 'website' }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ ogtitle or title or site.name }}">
+  <meta name="twitter:description" content="{{ description or site.description }}">
+  <meta name="twitter:image" content="{{ site.url }}/og.png">
+  <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="{{ site.name }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='10 0 80 100'><text x='10' y='.9em' font-size='100' font-weight='bold' fill='%231f7a4d'>⟩</text></svg>">
+  <script>
+    (function () { try { var s = localStorage.getItem('theme'); if (s === 'amber') { document.documentElement.classList.add('amber'); document.addEventListener('DOMContentLoaded', function () { var f = document.querySelector("link[rel='icon']"); if (f) { f.href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='10 0 80 100'><text x='10' y='.9em' font-size='100' font-weight='bold' fill='%23ffb000'>⟩</text></svg>"; } }); } } catch (e) {} })();
+  </script>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Toggle theme">
+    <span class="moon">◐</span><span class="sun">◑</span>
+  </button>
+
+  <div class="wrap">
+
+    <header>
+      <div class="kicker">appsec · security research <span class="cursor"></span></div>
+      <div class="name"><span>~</span> <span class="typed" id="typed"></span></div>
+      <div class="tagline"><a href="https://www.linkedin.com/in/bruno-menna/" class="social">linkedin ↗</a></div>
+    </header>
+
+    <nav>
+      <a href="/" data-page="posts">posts</a>
+      <span class="nav-sep">/</span>
+      <a href="/#talks" data-page="talks">talks</a>
+      <span class="nav-sep">/</span>
+      <a href="/#about" data-page="about">about</a>
+    </nav>
+
+    <div class="sep">────────────────────────────────</div>
+
+    {{ content | safe }}
+
+    <footer>
+      <div>no frameworks were harmed in the making of this site · 0xDEADC0DE</div>
+      <br>
+      <span class="cursor"></span>
+    </footer>
+
+  </div>
+
+  <div class="top-btn" id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</div>
+  <script src="/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,247 @@
+---
+title: "how every language handles ipv4-mapped ipv6 differently (and why your ssrf protection doesn't work)"
+date: 2026-04-21
+readtime: "15 min read"
+description: "i've reported 5 SSRF bypass CVEs in major open-source projects — librechat (35k stars), twenty crm (44k stars), stirling-pdf (77k stars), flowise (47k star"
+permalink: /posts/ipv4mapped/
+---
+<p>i've reported 5 SSRF bypass CVEs in major open-source projects — librechat (35k stars), twenty crm (44k stars), stirling-pdf (77k stars), flowise (47k stars), and new-api (27k stars). all five are ssrf filter bypasses, and the thread running through the two i'll dig into here — librechat and twenty — is this: every programming language handles ipv4-mapped ipv6 addresses differently, and almost nobody knows how their language actually behaves.</p>
+
+        <p>this post documents the exact runtime behavior of 7 languages when they encounter <code>::ffff:127.0.0.1</code>. every output below is from real code execution, not documentation. the results are worse than you think.</p>
+
+        <p><strong>what is an ipv4-mapped ipv6 address?</strong></p>
+
+        <p>ipv6 has a compatibility feature: you can represent any ipv4 address in ipv6 notation by prepending <code>::ffff:</code>. so <code>127.0.0.1</code> becomes <code>::ffff:127.0.0.1</code>. same machine, same destination, different notation.</p>
+
+        <p>the problem starts when you realize that <code>169.254.169.254</code> (the cloud metadata endpoint) can also be written as <code>::ffff:169.254.169.254</code>. and that 169 in decimal is <code>a9</code> in hex. and 254 is <code>fe</code>. so <code>169.254</code> becomes <code>a9fe</code>. the full address can be written as <code>::ffff:a9fe:a9fe</code>.</p>
+
+        <p>all of these point to the same server:</p>
+
+        <table>
+          <tr><th>form</th><th>status against typical ssrf filter</th></tr>
+          <tr><td><code>169.254.169.254</code></td><td><span class="blocked">blocked</span></td></tr>
+          <tr><td><code>::ffff:169.254.169.254</code></td><td><span class="depends">depends</span></td></tr>
+          <tr><td><code>::ffff:a9fe:a9fe</code></td><td><span class="bypass">bypass</span></td></tr>
+          <tr><td><code>0:0:0:0:0:ffff:a9fe:a9fe</code></td><td><span class="bypass">bypass</span></td></tr>
+          <tr><td><code>[::ffff:a9fe:a9fe]</code></td><td><span class="bypass">bypass</span></td></tr>
+        </table>
+
+        <p>the question is: does your language's standard library help you catch these, or does it make things worse?</p>
+
+        <p><strong>node.js v25 — the silent hex converter</strong></p>
+
+        <p>node.js has the most dangerous behavior of all tested languages.</p>
+
+        <p>when you pass an ipv4-mapped address through <code>new URL()</code>, node's WHATWG URL parser converts the dotted-decimal ipv4 portion to hexadecimal:</p>
+
+<pre><span class="g">new URL</span>('http://[::ffff:169.254.169.254]/').hostname → <span class="y">[::ffff:a9fe:a9fe]</span>
+<span class="g">new URL</span>('http://[::ffff:127.0.0.1]/').hostname       → <span class="y">[::ffff:7f00:1]</span>
+<span class="g">new URL</span>('http://[::ffff:10.0.0.1]/').hostname        → <span class="y">[::ffff:a00:1]</span></pre>
+
+        <p>this is the conversion that broke librechat's ssrf protection. their <code>isPrivateIP</code> function used a regex that matched digits with dots. after <code>new URL()</code>, the hostname contains letters and colons. the regex never matches. bypass.</p>
+
+        <p>to make matters worse, node has no built-in <code>isPrivate()</code> or <code>isLoopback()</code> for IP addresses. <code>net.isIP()</code> tells you if it's v4 or v6 but not if it's private. there's exactly one native tool that gets it right — <code>net.BlockList</code>: an ipv4 rule you add <em>does</em> match the ipv4-mapped form, even after the hex normalization (<code>blocklist.check('::ffff:a00:1', 'ipv6')</code> returns <code>true</code> for a blocked <code>10.0.0.1</code>), and it correctly lets through anything you didn't list. the catch is that almost nobody reaches for it — everyone hand-rolls a regex instead, and that's exactly where the bypass lives.</p>
+
+        <p><em>bottom line: node.js actively transforms your input into a form that bypasses hand-rolled protections — and the one built-in that handles the transformed form, <code>net.BlockList</code>, is the one nobody uses.</em></p>
+
+        <p><strong>python 3.14 — the silent False</strong></p>
+
+        <p>python doesn't normalize to hex — <code>ipaddress.ip_address('::ffff:127.0.0.1')</code> preserves the dotted form. and since python 3.12.4, <code>.is_loopback</code> and <code>.is_private</code> correctly return <code>True</code> for ipv4-mapped addresses. if you're on a recent python, the predicates work.</p>
+
+        <p>the trap is elsewhere. range-based containment — the approach most ssrf filters actually use — fails silently:</p>
+
+<pre>addr = ipaddress.ip_address(<span class="y">'::ffff:127.0.0.1'</span>)
+net = ipaddress.ip_network(<span class="y">'127.0.0.0/8'</span>)
+print(addr in net)  <span class="c"># False — no error, just wrong</span></pre>
+
+        <p>an IPv6Address is never "in" an IPv4Network. python doesn't raise a TypeError. it just returns <code>False</code>. your filter thinks the address is safe.</p>
+
+        <p>the fix: call <code>.ipv4_mapped</code> first to extract the IPv4Address, then check containment. but most developers don't know <code>.ipv4_mapped</code> exists.</p>
+
+        <p><em>bottom line: python's tools are correct if you know the right incantation. most people don't.</em></p>
+
+        <p><strong>go 1.22 — the api migration trap</strong></p>
+
+        <p>go has two IP address APIs, and they behave differently.</p>
+
+        <p>the old <code>net.IP</code> API silently collapses ipv4-mapped to ipv4:</p>
+
+<pre>net.ParseIP(<span class="y">"::ffff:127.0.0.1"</span>).String()      → <span class="y">"127.0.0.1"</span>
+net.ParseIP(<span class="y">"::ffff:127.0.0.1"</span>).IsLoopback()   → <span class="y">true</span></pre>
+
+        <p>this is actually safe for ssrf filters. the mapping disappears, and the loopback check works.</p>
+
+        <p>the modern <code>netip.Addr</code> API does the opposite:</p>
+
+<pre>netip.MustParseAddr(<span class="y">"::ffff:127.0.0.1"</span>).IsLoopback()  → <span class="no">false</span>
+netip.MustParseAddr(<span class="y">"::ffff:127.0.0.1"</span>).IsPrivate()   → <span class="no">false</span></pre>
+
+        <p>on <code>netip.Addr</code>, you must call <code>.Unmap()</code> first. without it, all predicates return false for mapped addresses. the "new correct" API is the dangerous one.</p>
+
+        <p><em>bottom line: go developers migrating from net.IP to netip.Addr are introducing ssrf bypasses. the old api was accidentally safer.</em></p>
+
+        <p><strong>java 17 — the implicit unmapper</strong></p>
+
+        <p>java takes the opposite approach from everyone else. <code>InetAddress.getByName("::ffff:127.0.0.1")</code> returns an <code>Inet4Address</code>, not an <code>Inet6Address</code>. the mapping vanishes completely:</p>
+
+<pre>InetAddress.getByName(<span class="y">"::ffff:127.0.0.1"</span>).getClass()           → <span class="y">Inet4Address</span>
+InetAddress.getByName(<span class="y">"::ffff:127.0.0.1"</span>).getHostAddress()     → <span class="y">"127.0.0.1"</span>
+InetAddress.getByName(<span class="y">"::ffff:127.0.0.1"</span>).isLoopbackAddress()  → <span class="yes">true</span></pre>
+
+        <p>if you resolve through <code>InetAddress.getByName()</code> and then check predicates, you're safe. java does the unmapping for you.</p>
+
+        <p><em>bottom line: java is the safest by default, but only if you go through InetAddress. string-based filters still break.</em></p>
+
+        <p><strong>php 8.3 — the FILTER_FLAG footgun</strong></p>
+
+        <p>php's <code>filter_var</code> with <code>FILTER_FLAG_NO_PRIV_RANGE</code> is the recommended way to validate IPs in many tutorials. it doesn't work for ipv4-mapped addresses:</p>
+
+<pre>filter_var(<span class="y">'::ffff:10.0.0.1'</span>, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE) → <span class="no">valid (accepts!)</span></pre>
+
+        <p>the flag only checks ipv4 rfc 1918 ranges. ipv4-mapped ipv6 addresses representing private IPs pass through. every php ssrf guide that recommends <code>FILTER_FLAG_NO_PRIV_RANGE</code> alone is producing vulnerable code.</p>
+
+        <p><em>bottom line: the most commonly recommended php ssrf defense doesn't catch ipv4-mapped addresses.</em></p>
+
+        <p><strong>ruby — got range matching right, fixed its predicates late</strong></p>
+
+        <p>ruby's <code>IPAddr</code> has <code>loopback?</code> and <code>private?</code> predicates. for years they both returned <code>false</code> for mapped addresses — and this wasn't just ancient ruby, it persisted through ruby 3.2. <code>private?</code> was fixed in ruby 3.3 (ipaddr 1.2.6, bug #19479) and <code>loopback?</code> a release later in ruby 3.4 (ipaddr 1.2.7). on anything older, the predicates lie. range inclusion, though, actually works across families:</p>
+
+<pre>IPAddr.new(<span class="y">'127.0.0.0/8'</span>).include?(IPAddr.new(<span class="y">'::ffff:127.0.0.1'</span>))  <span class="c"># → true</span></pre>
+
+        <p>this is the only language tested where a v4 range correctly matches an ipv4-mapped v6 address.</p>
+
+        <p><em>bottom line: ruby got the hard part right (range matching) but the easy part wrong for years — the predicates returned false for mapped until 3.3/3.4, so version matters.</em></p>
+
+        <p><strong>rust 1.95 — explicit but unforgiving</strong></p>
+
+        <p>rust parses ipv4-mapped addresses as <code>IpAddr::V6</code>. <code>Ipv6Addr::is_loopback()</code> only checks for <code>::1</code>, so <code>::ffff:127.0.0.1</code> is not considered loopback. there is no <code>is_private()</code> method on <code>Ipv6Addr</code> at all.</p>
+
+<pre><span class="c">let</span> v6: Ipv6Addr = <span class="y">"::ffff:127.0.0.1"</span>.parse().unwrap();
+v6.is_loopback()                                    <span class="c">// false</span>
+v6.to_ipv4_mapped().unwrap().is_loopback()           <span class="c">// true</span></pre>
+
+        <p><em>bottom line: rust makes you do the work explicitly. code that skips the unmapping step is silently broken.</em></p>
+
+        <p><strong>the cross-language summary</strong></p>
+
+        <table>
+          <tr>
+            <th>language</th>
+            <th>is_loopback?</th>
+            <th>is_private?</th>
+            <th>range match?</th>
+            <th>built-in unmap?</th>
+            <th>normalizes to hex?</th>
+          </tr>
+          <tr>
+            <td><strong>node.js</strong></td>
+            <td><span class="no">no api</span></td>
+            <td><span class="no">no api</span></td>
+            <td>n/a</td>
+            <td><span class="no">no</span></td>
+            <td><span class="no">yes</span></td>
+          </tr>
+          <tr>
+            <td><strong>python</strong></td>
+            <td><span class="yes">yes</span></td>
+            <td><span class="yes">yes</span></td>
+            <td><span class="no">no (silent)</span></td>
+            <td>.ipv4_mapped</td>
+            <td><span class="yes">no</span></td>
+          </tr>
+          <tr>
+            <td><strong>go (netip)</strong></td>
+            <td><span class="no">no</span></td>
+            <td><span class="no">no</span></td>
+            <td>n/a</td>
+            <td>.Unmap()</td>
+            <td><span class="yes">no</span></td>
+          </tr>
+          <tr>
+            <td><strong>go (net.IP)</strong></td>
+            <td><span class="yes">yes (auto)</span></td>
+            <td><span class="depends">partial</span></td>
+            <td>n/a</td>
+            <td>.To4()</td>
+            <td><span class="yes">no</span></td>
+          </tr>
+          <tr>
+            <td><strong>java</strong></td>
+            <td><span class="yes">yes (auto)</span></td>
+            <td><span class="yes">yes</span></td>
+            <td>n/a</td>
+            <td>automatic</td>
+            <td><span class="yes">no</span></td>
+          </tr>
+          <tr>
+            <td><strong>php</strong></td>
+            <td><span class="no">no</span></td>
+            <td><span class="no">accepts!</span></td>
+            <td>n/a</td>
+            <td><span class="no">no</span></td>
+            <td><span class="yes">no</span></td>
+          </tr>
+          <tr>
+            <td><strong>ruby</strong></td>
+            <td><span class="no">no</span></td>
+            <td><span class="no">no</span></td>
+            <td><span class="yes">yes</span></td>
+            <td>.native</td>
+            <td><span class="yes">no</span></td>
+          </tr>
+          <tr>
+            <td><strong>rust</strong></td>
+            <td><span class="no">no</span></td>
+            <td><span class="no">no api</span></td>
+            <td>n/a</td>
+            <td>.to_ipv4_mapped()</td>
+            <td><span class="yes">no</span></td>
+          </tr>
+        </table>
+
+        <p>the pattern is clear: in 5 out of 7 languages, the standard predicates fail on ipv4-mapped addresses.</p>
+
+        <p><strong>where ssrf filters break</strong></p>
+
+        <p>based on these results and the CVEs i've reported, ssrf filters break in four specific ways:</p>
+
+        <p><em>string-prefix filters.</em> any filter that checks <code>hostname.startsWith("127.")</code> or <code>hostname.startsWith("10.")</code> misses every ipv4-mapped form. in node.js it's even worse because the hostname becomes <code>[::ffff:7f00:1]</code> — hex with brackets.</p>
+
+        <p><em>range-based containment.</em> python's <code>ip_address in ip_network</code> returns silent <code>False</code> across families. no error, no warning. the filter thinks the address is safe.</p>
+
+        <p><em>predicate-only checks.</em> calling <code>.is_private()</code> or <code>.is_loopback()</code> directly on the mapped address fails in go (netip), ruby (before 3.3/3.4), rust, and php. only java, recent python, and recent ruby get this right.</p>
+
+        <p><em>missing unmapping step.</em> every language except java requires an explicit unmapping call. if the developer doesn't know this step exists, the filter has a gap.</p>
+
+        <p><strong>the minimum viable ssrf guard</strong></p>
+
+        <p>based on testing all 7 languages, here's what a correct ssrf filter must do:</p>
+
+        <p>1. parse the input as an IP address<br>
+        2. if it's ipv6, check if it's ipv4-mapped. if so, extract the embedded ipv4 and re-run all checks<br>
+        3. check against all private ranges: loopback (127/8), rfc 1918 (10/8, 172.16/12, 192.168/16), link-local (169.254/16), cgnat (100.64/10), ipv6 loopback (::1), ipv6 link-local (fe80::/10), ipv6 unique-local (fc00::/7)<br>
+        4. do all of this after DNS resolution, not on the input string</p>
+
+        <p>or better yet: don't implement it yourself. every custom implementation i've audited had at least one gap.</p>
+
+        <p><strong>real-world impact</strong></p>
+
+        <p>these aren't theoretical concerns. here are 5 ssrf filter-bypass CVEs i reported — two are exactly the ipv4-mapped case above, the other three are related bypasses in the same family (a missing range, an unauth fetch, an unresolved hostname):</p>
+
+        <p>— <strong>librechat</strong> (CVE-2026-31943, CVSS 8.5) — node.js URL parser normalized to hex, regex didn't match. 35k stars.<br>
+        — <strong>twenty crm</strong> (GHSA-vrcj-hv2q-c58m) — same pattern, independent codebase. 44k stars.<br>
+        — <strong>stirling-pdf</strong> (GHSA-hg2c-wm3r-f7xx) — missing rfc 6598 range. 77k stars, 20M downloads.<br>
+        — <strong>flowise</strong> (GHSA-r745-8hwv-h473) — unauth oauth2 refresh enabled non-blind ssrf. 47k stars.<br>
+        — <strong>new-api</strong> (GHSA-6qcr-qxgr-m7fv) — unresolved hostname bypassed ip filter. 27k stars.</p>
+
+        <p>230k+ combined stars. five projects, five bypasses — different representations and entry points, but the same root problem: the code that validates an address and the code that connects to it disagree about what it is.</p>
+
+        <p><strong>test it yourself</strong></p>
+
+        <p>open a node.js terminal and run:</p>
+
+<pre><span class="g">$</span> node <span class="y">-e</span> "console.log(new URL('http://[::ffff:169.254.169.254]/').hostname)"</pre>
+
+        <p>if you see <code>[::ffff:a9fe:a9fe]</code>, your ssrf filter that checks for <code>169.254</code> will never see it.</p>
+
+        <p>now go look at your project's <code>isPrivateIP</code> function. does it handle this?</p>

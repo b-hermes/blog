@@ -1,0 +1,12 @@
+---
+layout: base.njk
+ogtype: article
+---
+<div class="post-page">
+  <a href="/" class="back">&larr; back</a>
+  <h1>{{ title }}</h1>
+  <div class="meta">{{ date | readdate }} &middot; {{ readtime }}</div>
+  <div class="content">
+    {{ content | safe }}
+  </div>
+</div>

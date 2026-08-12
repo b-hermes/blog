@@ -1,0 +1,78 @@
+---
+title: "mitmproxy setup for mobile interception"
+date: 2026-03-01
+readtime: "4 min read"
+description: "intercepting mobile app traffic is the first step in any mobile bug bounty engagement. mitmproxy is my go-to — it's free, scriptable, and works on both and"
+permalink: /posts/mitmproxy/
+---
+<p>intercepting mobile app traffic is the first step in any mobile bug bounty engagement. mitmproxy is my go-to — it's free, scriptable, and works on both android and ios. here's the setup i use every time.</p>
+
+        <p>install it:</p>
+
+<pre><span class="g">$</span> pip install mitmproxy
+<span class="g">$</span> mitmproxy <span class="y">--version</span></pre>
+
+        <p>start the proxy. by default it runs on port 8080:</p>
+
+<pre><span class="g">$</span> mitmproxy <span class="y">-p</span> 8080</pre>
+
+        <p>now configure your device to use the proxy. your laptop and phone need to be on the same network. find your local ip:</p>
+
+<pre><span class="g">$</span> ifconfig | grep <span class="y">"inet "</span> | grep <span class="y">-v</span> 127.0.0.1
+<span class="c"># inet 192.168.1.42 ...</span></pre>
+
+        <p>on your phone, go to wifi settings, set the proxy to manual, enter your ip and port 8080. open a browser and navigate to <code>mitm.it</code> — this page serves the mitmproxy CA certificate.</p>
+
+        <p>download and install the cert. on android, this gets you user-level interception which works for most browser traffic. but apps targeting api 24+ only trust system-level certs by default.</p>
+
+        <p>to install as a system cert on a rooted android device:</p>
+
+<pre><span class="c"># copy the cert from ~/.mitmproxy/</span>
+<span class="g">$</span> hashed_name=<span class="y">$(</span>openssl x509 <span class="y">-inform</span> PEM \
+  <span class="y">-subject_hash_old</span> \
+  <span class="y">-in</span> ~/.mitmproxy/mitmproxy-ca-cert.cer \
+  | head <span class="y">-1</span><span class="y">)</span>
+
+<span class="g">$</span> cp ~/.mitmproxy/mitmproxy-ca-cert.cer <span class="y">$hashed_name</span>.0
+
+<span class="c"># push to device system cert store</span>
+<span class="g">$</span> adb root
+<span class="g">$</span> adb remount
+<span class="g">$</span> adb push <span class="y">$hashed_name</span>.0 /system/etc/security/cacerts/
+<span class="g">$</span> adb shell chmod 644 /system/etc/security/cacerts/<span class="y">$hashed_name</span>.0
+<span class="g">$</span> adb reboot</pre>
+
+        <p>after reboot, mitmproxy's cert is trusted at the system level. apps that don't implement certificate pinning will now send all traffic through your proxy — no complaints.</p>
+
+        <p>one caveat: this system-cert method works on android 13 and below. on android 14+ the trust store moved into the conscrypt apex and <code>/system</code> is read-only under verity, so <code>adb remount</code> + pushing to <code>/system/etc/security/cacerts/</code> won't stick. on 14+ you either patch the apex cert store (rooted, more involved) or — usually easier — skip the system cert and use frida to disable pinning instead (covered in the jadx + frida post).</p>
+
+        <p>for apps that do implement pinning, you'll need frida to bypass it (covered in the jadx + frida post). but the proxy setup stays the same.</p>
+
+        <p>some useful mitmproxy flags i use constantly:</p>
+
+<pre><span class="c"># only intercept specific domains</span>
+<span class="g">$</span> mitmproxy <span class="y">--set</span> intercept="~d api.target.com"
+
+<span class="c"># dump traffic to a file for later analysis</span>
+<span class="g">$</span> mitmdump <span class="y">-w</span> traffic.flow
+
+<span class="c"># replay saved traffic</span>
+<span class="g">$</span> mitmdump <span class="y">-r</span> traffic.flow
+
+<span class="c"># run with a custom script (e.g. log all auth tokens)</span>
+<span class="g">$</span> mitmproxy <span class="y">-s</span> log_tokens.py</pre>
+
+        <p>speaking of scripts — mitmproxy's python api is where it gets really powerful. here's a quick addon that logs every authorization header it sees:</p>
+
+<pre><span class="c"># log_tokens.py</span>
+from mitmproxy import http
+
+def request(flow: http.HTTPFlow):
+    auth = flow.request.headers.get(<span class="y">"Authorization"</span>)
+    if auth:
+        print(f<span class="y">"[+] {flow.request.url}"</span>)
+        print(f<span class="y">"    Token: {auth}"</span>)</pre>
+
+        <p>run it and every request with an auth header gets logged. useful for understanding how an app handles sessions, token refresh, and multi-account flows.</p>
+
+        <p>that's the core setup. proxy running, cert installed, traffic flowing. from here you can start mapping endpoints, fuzzing parameters, and looking for the real bugs.</p>

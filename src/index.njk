@@ -1,0 +1,22 @@
+---
+layout: base.njk
+title: bruno menna
+description: "security researcher. product security engineer. 22 cves published."
+---
+<div id="posts" class="page visible">
+  <div class="section-label">writing · {{ collections.post.length }} posts</div>
+  {% for p in collections.post %}
+  <div class="post">
+    <div class="post-date">{{ p.date | shortdate }}</div>
+    <div class="post-title"><a href="{{ p.url }}">{{ p.data.title }}</a></div>
+  </div>
+  {% endfor %}
+</div>
+
+<div id="talks" class="page">
+  {% include "talks.inc.njk" %}
+</div>
+
+<div id="about" class="page about">
+  {% include "about.inc.njk" %}
+</div>

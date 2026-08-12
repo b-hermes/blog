@@ -1,0 +1,32 @@
+---
+title: "the first 30 minutes on a new target"
+date: 2026-04-13
+readtime: "5 min read"
+description: "when i open a new program, i don't start running tools. i start understanding what the app does."
+permalink: /posts/first30/
+---
+<p>when i open a new program, i don't start running tools. i start understanding what the app does.</p>
+
+        <p>i sign up, create an account, and use it like a normal user. burp is capturing everything in the background, but i'm not looking at burp yet — i'm looking at the app.</p>
+
+        <p>what i'm looking for:</p>
+
+        <p><strong>where are the IDs?</strong> — every time i see a number or uuid in a url, a request, a response, i take note. <code>/api/org/123/members</code> — that's getting tested later.</p>
+
+        <p><strong>what's the permission model?</strong> — roles? admin/member/viewer? orgs, teams, projects? the more layers, the higher the chance someone forgot a check somewhere.</p>
+
+        <p><strong>what's "mine" vs "theirs"?</strong> — if i can see my profile at <code>/users/me</code>, does <code>/users/123</code> exist? if i can list my projects, can i list another org's?</p>
+
+        <p><strong>features that look new</strong> — changelogs, product blogs, "new!" badges in the UI. new feature = new code = less tested.</p>
+
+        <p><strong>features that look forgotten</strong> — export, webhook config, api keys page, advanced settings. nobody tests what nobody uses.</p>
+
+        <p><strong>integrations</strong> — oauth, webhooks, api tokens, sso. every integration is a new attack surface with its own auth.</p>
+
+        <p>after 30 minutes i have a mental list of where to attack. then i open burp, look at the sitemap, and go endpoint by endpoint.</p>
+
+        <p><strong>here's the thing most people miss though:</strong> don't just test the endpoints you see. read the javascript. apps ship their entire api client in the bundle — routes the UI doesn't use yet, admin endpoints behind feature flags, internal debug paths that never got removed. some of the best bugs i've found were in endpoints hidden in js bundles, not in anything the UI actually exposes. while you're in there, check for an exposed api schema too — <code>/swagger.json</code>, <code>/openapi.json</code>, <code>/api-docs</code> — if one's public it hands you every route and parameter at once.</p>
+
+        <p>pull every js file. search for <code>/api/</code>, <code>fetch(</code>, <code>axios.</code>, <code>endpoint</code>, <code>admin</code>, <code>internal</code>. build a list of every route the app knows about, not just the ones it shows you. then test those with your low-priv account. that gap — between what the frontend knows and what the frontend shows — is where the best bugs live.</p>
+
+        <p>the bugs i'm proudest of didn't come from automated scanning. they came from understanding the app better than whoever tested it before me.</p>

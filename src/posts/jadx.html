@@ -1,0 +1,72 @@
+---
+title: "reverse engineering android apps with jadx + frida"
+date: 2026-04-10
+readtime: "5 min read"
+description: "most android apps trust the client way too much. hidden endpoints, hardcoded keys, debug flags left in production. all you need is the right toolchain to f"
+permalink: /posts/jadx/
+---
+<p>most android apps trust the client way too much. hidden endpoints, hardcoded keys, debug flags left in production. all you need is the right toolchain to find them.</p>
+
+        <p>the approach is simple: <code>jadx</code> for static analysis, <code>frida</code> for runtime hooking. one shows you the code, the other lets you mess with it while it runs.</p>
+
+        <p>start by pulling the apk and throwing it into jadx:</p>
+
+<pre><span class="g">$</span> adb shell pm path com.target.app
+<span class="c"># package:/data/app/~~aB3x9Q==/com.target.app-Kd90p==/base.apk   (android 8+ randomizes this)</span>
+<span class="g">$</span> adb pull /data/app/~~aB3x9Q==/com.target.app-Kd90p==/base.apk   <span class="c"># use the exact path from above</span>
+<span class="g">$</span> jadx base.apk <span class="y">-d</span> output/</pre>
+
+        <p>look for api endpoints, auth logic, anything interesting. grep is your friend here. search for strings like <code>/api/</code>, <code>Authorization</code>, <code>Bearer</code>, <code>secret</code>.</p>
+
+<pre><span class="g">$</span> grep <span class="y">-rni</span> "api" output/sources/ | head <span class="y">-20</span>
+<span class="g">$</span> grep <span class="y">-rni</span> "secret\|key\|token" output/sources/</pre>
+
+        <p>once you find something interesting, hook it with frida to see what's happening at runtime. say you found a client-side <code>isAdmin()</code> check — flipping it won't defeat server-enforced authorization, but it's perfect for unlocking gated UI and seeing what the app <em>could</em> do:</p>
+
+<pre><span class="c">// bypass.js</span>
+Java.perform(function() {
+  var auth = Java.use(<span class="y">"com.target.app.AuthManager"</span>);
+  auth.isAdmin.implementation = function() {
+    console.log(<span class="y">"[+] isAdmin() called, returning true"</span>);
+    return true;
+  };
+});</pre>
+
+<pre><span class="g">$</span> frida <span class="y">-U -f</span> com.target.app <span class="y">-l</span> bypass.js</pre>
+
+        <p>certificate pinning? most apps use okhttp or a custom trust manager. the idea is simple — the app validates the server's certificate against a pinned hash. if it doesn't match, the connection drops. but since we control the runtime, we just hook the check and make it always pass.</p>
+
+        <p>for okhttp-based pinning, the target is usually <code>CertificatePinner.check()</code>:</p>
+
+<pre><span class="c">// ssl_bypass.js</span>
+Java.perform(function() {
+  var CertPinner = Java.use(<span class="y">"okhttp3.CertificatePinner"</span>);
+  CertPinner.check.overload(
+    <span class="y">"java.lang.String"</span>,
+    <span class="y">"java.util.List"</span>
+  ).implementation = function(hostname, peerCerts) {
+    console.log(<span class="y">"[+] bypassing pin for: "</span> + hostname);
+    return;
+  };
+});</pre>
+
+        <p>for apps using a custom <code>TrustManager</code>, you need to find the class that implements <code>X509TrustManager</code> and hook <code>checkServerTrusted()</code>:</p>
+
+<pre><span class="c">// trustmanager_bypass.js</span>
+Java.perform(function() {
+  var tm = Java.use(<span class="y">"com.target.app.CustomTrustManager"</span>);
+  tm.checkServerTrusted.implementation = function(chain, authType) {
+    console.log(<span class="y">"[+] trusting all certs"</span>);
+    return;
+  };
+});</pre>
+
+        <p>run it the same way:</p>
+
+<pre><span class="g">$</span> frida <span class="y">-U -f</span> com.target.app <span class="y">-l</span> ssl_bypass.js</pre>
+
+        <p>now the pinning is out of the way. point the device at burp — with burp's CA installed as a <em>system</em> cert (android 7+ apps don't trust user CAs by default; see the mitmproxy post) — and you're intercepting every request the app makes: auth tokens, api calls, everything.</p>
+
+        <p>one thing to watch out for: some apps stack multiple pinning layers. you might bypass okhttp but still get blocked by a native check. in that case, look for <code>libssl</code> hooks or use something like <code>objection</code> which covers most common cases out of the box.</p>
+
+        <p>the real value isn't in any single trick. it's in chaining static findings with dynamic confirmation. jadx tells you what the code <em>could</em> do. frida tells you what it <em>actually</em> does.</p>

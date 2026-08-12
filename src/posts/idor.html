@@ -1,0 +1,76 @@
+---
+title: "finding idors at scale"
+date: 2026-04-03
+readtime: "7 min read"
+description: "idor — insecure direct object reference. it's been on the owasp top 10 for years and it's still everywhere. the concept is almost embarrassingly simple: ch"
+permalink: /posts/idor/
+---
+<p>idor — insecure direct object reference. it's been on the owasp top 10 for years and it's still everywhere. the concept is almost embarrassingly simple: change an id in a request, get someone else's data. and yet it remains one of the most rewarding bug classes to hunt for.</p>
+
+        <p>i think the reason it persists is that it's not really a coding mistake. it's an architecture mistake. developers build features around objects — users, orders, documents — and forget to ask the most basic question: does this person have permission to access this specific object?</p>
+
+        <p><strong>the mindset</strong></p>
+
+        <p>the first thing to understand is that idor isn't just "change the id and see what happens." that's the mechanic, not the methodology. the real skill is understanding how the application models ownership and access.</p>
+
+        <p>every app has a hierarchy. users belong to organizations. orders belong to users. documents belong to projects. the question is always: where does the app check that chain of ownership, and where does it skip?</p>
+
+        <p>most apps get the obvious ones right. <code>/api/users/123/profile</code> probably checks if you're user 123. but what about <code>/api/users/123/invoices</code>? or <code>/api/users/123/api-keys</code>? the deeper you go into the object graph, the more likely someone forgot a check.</p>
+
+        <p><strong>the two-account approach</strong></p>
+
+        <p>always test with two accounts. always. you can't find access control bugs with a single session. create account A (the victim) and account B (the attacker). use the app fully as account A — create data, upload files, configure settings. then try to access all of it as account B.</p>
+
+        <p>this sounds obvious but most people skip it because it's tedious. setting up two accounts with realistic data takes time. but it's the foundation of every idor you'll ever find.</p>
+
+        <p><strong>where to look</strong></p>
+
+        <p>after testing hundreds of apps, these are the places where idors show up most consistently:</p>
+
+        <p><em>api endpoints that accept an id you didn't choose.</em> if you're making a request and the id came from a url, a dropdown, a hidden field, or a previous api response — that's a candidate. the app gave you that id, but does it verify you should have it?</p>
+
+        <p><em>export and download features.</em> generating a pdf report, exporting csv data, downloading an attachment. these are often built as separate services that receive an object id and return the file. the auth check happens in the main app, but the export service just trusts the id it receives.</p>
+
+        <p><em>notification and activity endpoints.</em> "get my recent activity" or "get my notifications" often leak data because they aggregate from multiple sources. the aggregation layer might not enforce the same permissions as each individual source.</p>
+
+        <p><em>admin and settings endpoints.</em> changing org settings, managing team members, updating billing info. these are high-value targets because the impact of unauthorized access is severe. and they're often less tested because fewer people use them.</p>
+
+        <p><em>GraphQL.</em> graphql makes idor testing interesting because the client controls the query structure. you can ask for nested relationships — "give me this project's organization's other projects" — and find paths the developers never intended to expose.</p>
+
+        <p><strong>the uuid trap</strong></p>
+
+        <p>a lot of developers think using uuids instead of sequential ids prevents idor. it doesn't. uuids make enumeration harder, but they don't solve the access control problem. if i can get your uuid from anywhere — a shared link, an api response, a websocket message, an email — i can still use it.</p>
+
+        <p>places uuids leak constantly: invitation links, public profiles, shared documents, api list endpoints, error messages, and javascript source files. once you have one valid uuid, you can test every endpoint that accepts it.</p>
+
+        <p><strong>beyond read access</strong></p>
+
+        <p>here's what separates a medium finding from a critical one: don't stop at reading data. test write and delete operations too.</p>
+
+        <p>can account B modify account A's profile? update their email address? change their password? that's account takeover through idor — critical severity.</p>
+
+        <p>can account B delete account A's projects? remove their team members? cancel their subscription? that's destructive idor — also critical.</p>
+
+        <p>most hunters stop at "i can see another user's data." that's valid, but the real impact comes from testing what else you can do with that access.</p>
+
+        <p><strong>the subtle ones</strong></p>
+
+        <p>the best idors aren't obvious. they hide in features you wouldn't think to test:</p>
+
+        <p>— search endpoints that accept a <code>scope</code> or <code>org_id</code> filter and return results from that scope without checking membership<br>
+        — webhook configurations where you can point someone else's events to your url<br>
+        — file upload endpoints where the <code>parent_id</code> determines which project the file lands in<br>
+        — sso and saml flows where the <code>account_id</code> in the assertion isn't validated against the authenticated session<br>
+        — api key management where you can list or revoke keys belonging to another user</p>
+
+        <p>these are the findings that make programs pay attention. not because they're technically complex, but because they show a deep understanding of how the application works.</p>
+
+        <p><strong>doing it at scale</strong></p>
+
+        <p>testing every request by hand with two sessions gets old fast. what makes this scale is a burp extension that replays traffic for you — <strong>autorize</strong> or <strong>auth analyzer</strong>. you browse the app as the victim (account A), and the extension automatically re-issues every request with the attacker's (account B) session, then flags anything that still comes back <code>200</code> with the same data. suddenly you're testing hundreds of endpoints for authz drift while you just click around. that's how you go from "change one id" to "audit the whole object graph in one pass."</p>
+
+        <p><strong>writing the report</strong></p>
+
+        <p>when you find an idor, the report matters as much as the finding. always include: what you accessed, whose data it was, and what an attacker could do with it. don't just say "i changed the id and got a 200." explain the business impact. "an attacker can read any customer's invoices, including billing addresses, payment amounts, and line items" hits different than "idor on /api/invoices/:id."</p>
+
+        <p>idor isn't going away. as long as apps have objects and users, there will be missing access checks. the hunters who find them consistently aren't the ones with the best tools — they're the ones who understand the application deeply enough to know where to look.</p>

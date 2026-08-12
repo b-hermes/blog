@@ -653,7 +653,7 @@
 
     <!-- POSTS -->
     <div id="posts" class="page visible">
-      <div class="section-label">writing · 7 posts</div>
+      <div class="section-label">writing · 6 posts</div>
       <div class="post">
         <div class="post-date">apr 21</div>
         <div class="post-title"><a href="#" onclick="show('post-ipv4mapped',null);return false">how every language handles ipv4-mapped ipv6 differently (and why your ssrf protection doesn't work)</a></div>
@@ -669,10 +669,6 @@
       <div class="post">
         <div class="post-date">apr 03</div>
         <div class="post-title"><a href="#" onclick="show('post-idor',null);return false">finding idors at scale</a></div>
-      </div>
-      <div class="post">
-        <div class="post-date">mar 22</div>
-        <div class="post-title"><a href="#" onclick="show('post-recon',null);return false">my recon methodology: from scope to first bug</a></div>
       </div>
       <div class="post">
         <div class="post-date">mar 15</div>
@@ -771,16 +767,16 @@
         <p>start by pulling the apk and throwing it into jadx:</p>
 
 <pre><span class="g">$</span> adb shell pm path com.target.app
-<span class="c"># package:/data/app/com.target.app/base.apk</span>
-<span class="g">$</span> adb pull /data/app/com.target.app/base.apk
-<span class="g">$</span> jadx <span class="y">--decompile</span> base.apk <span class="y">-d</span> output/</pre>
+<span class="c"># package:/data/app/~~aB3x9Q==/com.target.app-Kd90p==/base.apk   (android 8+ randomizes this)</span>
+<span class="g">$</span> adb pull /data/app/~~aB3x9Q==/com.target.app-Kd90p==/base.apk   <span class="c"># use the exact path from above</span>
+<span class="g">$</span> jadx base.apk <span class="y">-d</span> output/</pre>
 
         <p>look for api endpoints, auth logic, anything interesting. grep is your friend here. search for strings like <code>/api/</code>, <code>Authorization</code>, <code>Bearer</code>, <code>secret</code>.</p>
 
 <pre><span class="g">$</span> grep <span class="y">-rni</span> "api" output/sources/ | head <span class="y">-20</span>
 <span class="g">$</span> grep <span class="y">-rni</span> "secret\|key\|token" output/sources/</pre>
 
-        <p>once you find something interesting, hook it with frida to see what's happening at runtime. say you found an <code>isAdmin()</code> check:</p>
+        <p>once you find something interesting, hook it with frida to see what's happening at runtime. say you found a client-side <code>isAdmin()</code> check — flipping it won't defeat server-enforced authorization, but it's perfect for unlocking gated UI and seeing what the app <em>could</em> do:</p>
 
 <pre><span class="c">// bypass.js</span>
 Java.perform(function() {
@@ -824,7 +820,7 @@ Java.perform(function() {
 
 <pre><span class="g">$</span> frida <span class="y">-U -f</span> com.target.app <span class="y">-l</span> ssl_bypass.js</pre>
 
-        <p>now all traffic flows through your proxy. point the device to burp, and you're intercepting every request the app makes — auth tokens, api calls, everything.</p>
+        <p>now the pinning is out of the way. point the device at burp — with burp's CA installed as a <em>system</em> cert (android 7+ apps don't trust user CAs by default; see the mitmproxy post) — and you're intercepting every request the app makes: auth tokens, api calls, everything.</p>
 
         <p>one thing to watch out for: some apps stack multiple pinning layers. you might bypass okhttp but still get blocked by a native check. in that case, look for <code>libssl</code> hooks or use something like <code>objection</code> which covers most common cases out of the box.</p>
 
@@ -839,7 +835,7 @@ Java.perform(function() {
       <h1>how every language handles ipv4-mapped ipv6 differently (and why your ssrf protection doesn't work)</h1>
       <div class="meta">apr 21, 2026 &middot; 15 min read</div>
       <div class="content">
-        <p>i've reported 5 SSRF bypass CVEs in major open-source projects — librechat (35k stars), twenty crm (44k stars), stirling-pdf (77k stars), flowise (47k stars), and new-api (27k stars). the same class of bug, over and over. the root cause isn't lazy developers. it's that every programming language handles ipv4-mapped ipv6 addresses differently, and almost nobody knows how their language actually behaves.</p>
+        <p>i've reported 5 SSRF bypass CVEs in major open-source projects — librechat (35k stars), twenty crm (44k stars), stirling-pdf (77k stars), flowise (47k stars), and new-api (27k stars). all five are ssrf filter bypasses, and the thread running through the two i'll dig into here — librechat and twenty — is this: every programming language handles ipv4-mapped ipv6 addresses differently, and almost nobody knows how their language actually behaves.</p>
 
         <p>this post documents the exact runtime behavior of 7 languages when they encounter <code>::ffff:127.0.0.1</code>. every output below is from real code execution, not documentation. the results are worse than you think.</p>
 
@@ -930,8 +926,7 @@ InetAddress.getByName(<span class="y">"::ffff:127.0.0.1"</span>).isLoopbackAddre
 
         <p>php's <code>filter_var</code> with <code>FILTER_FLAG_NO_PRIV_RANGE</code> is the recommended way to validate IPs in many tutorials. it doesn't work for ipv4-mapped addresses:</p>
 
-<pre>filter_var(<span class="y">'::ffff:127.0.0.1'</span>, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE) → <span class="no">valid (accepts!)</span>
-filter_var(<span class="y">'::ffff:10.0.0.1'</span>,  FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE) → <span class="no">valid (accepts!)</span></pre>
+<pre>filter_var(<span class="y">'::ffff:10.0.0.1'</span>, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE) → <span class="no">valid (accepts!)</span></pre>
 
         <p>the flag only checks ipv4 rfc 1918 ranges. ipv4-mapped ipv6 addresses representing private IPs pass through. every php ssrf guide that recommends <code>FILTER_FLAG_NO_PRIV_RANGE</code> alone is producing vulnerable code.</p>
 
@@ -1061,7 +1056,7 @@ v6.to_ipv4_mapped().unwrap().is_loopback()           <span class="c">// true</sp
 
         <p><strong>real-world impact</strong></p>
 
-        <p>these aren't theoretical concerns. here are 5 CVEs i reported, all caused by these exact behaviors:</p>
+        <p>these aren't theoretical concerns. here are 5 ssrf filter-bypass CVEs i reported — two are exactly the ipv4-mapped case above, the other three are related bypasses in the same family (a missing range, an unauth fetch, an unresolved hostname):</p>
 
         <p>— <strong>librechat</strong> (CVE-2026-31943, CVSS 8.5) — node.js URL parser normalized to hex, regex didn't match. 35k stars.<br>
         — <strong>twenty crm</strong> (GHSA-vrcj-hv2q-c58m) — same pattern, independent codebase. 44k stars.<br>
@@ -1069,7 +1064,7 @@ v6.to_ipv4_mapped().unwrap().is_loopback()           <span class="c">// true</sp
         — <strong>flowise</strong> (GHSA-r745-8hwv-h473) — unauth oauth2 refresh enabled non-blind ssrf. 47k stars.<br>
         — <strong>new-api</strong> (GHSA-6qcr-qxgr-m7fv) — unresolved hostname bypassed ip filter. 27k stars.</p>
 
-        <p>230k+ combined stars. five projects, five bypasses. the pattern is systematic.</p>
+        <p>230k+ combined stars. five projects, five bypasses — different representations and entry points, but the same root problem: the code that validates an address and the code that connects to it disagree about what it is.</p>
 
         <p><strong>test it yourself</strong></p>
 
@@ -1109,11 +1104,11 @@ v6.to_ipv4_mapped().unwrap().is_loopback()           <span class="c">// true</sp
 
         <p>after 30 minutes i have a mental list of where to attack. then i open burp, look at the sitemap, and go endpoint by endpoint.</p>
 
-        <p><strong>here's the thing most people miss though:</strong> don't just test the endpoints you see. read the javascript. apps ship their entire api client in the bundle — routes the UI doesn't use yet, admin endpoints behind feature flags, internal debug paths that never got removed. i've found more bugs in endpoints hidden in js bundles than in anything the app actually exposes in the UI.</p>
+        <p><strong>here's the thing most people miss though:</strong> don't just test the endpoints you see. read the javascript. apps ship their entire api client in the bundle — routes the UI doesn't use yet, admin endpoints behind feature flags, internal debug paths that never got removed. some of the best bugs i've found were in endpoints hidden in js bundles, not in anything the UI actually exposes. while you're in there, check for an exposed api schema too — <code>/swagger.json</code>, <code>/openapi.json</code>, <code>/api-docs</code> — if one's public it hands you every route and parameter at once.</p>
 
         <p>pull every js file. search for <code>/api/</code>, <code>fetch(</code>, <code>axios.</code>, <code>endpoint</code>, <code>admin</code>, <code>internal</code>. build a list of every route the app knows about, not just the ones it shows you. then test those with your low-priv account. that gap — between what the frontend knows and what the frontend shows — is where the best bugs live.</p>
 
-        <p>most bugs i've found didn't come from automated scanning. they came from understanding the app better than whoever tested it before me.</p>
+        <p>the bugs i'm proudest of didn't come from automated scanning. they came from understanding the app better than whoever tested it before me.</p>
       </div>
     </div>
 
@@ -1183,120 +1178,15 @@ v6.to_ipv4_mapped().unwrap().is_loopback()           <span class="c">// true</sp
 
         <p>these are the findings that make programs pay attention. not because they're technically complex, but because they show a deep understanding of how the application works.</p>
 
+        <p><strong>doing it at scale</strong></p>
+
+        <p>testing every request by hand with two sessions gets old fast. what makes this scale is a burp extension that replays traffic for you — <strong>autorize</strong> or <strong>auth analyzer</strong>. you browse the app as the victim (account A), and the extension automatically re-issues every request with the attacker's (account B) session, then flags anything that still comes back <code>200</code> with the same data. suddenly you're testing hundreds of endpoints for authz drift while you just click around. that's how you go from "change one id" to "audit the whole object graph in one pass."</p>
+
         <p><strong>writing the report</strong></p>
 
         <p>when you find an idor, the report matters as much as the finding. always include: what you accessed, whose data it was, and what an attacker could do with it. don't just say "i changed the id and got a 200." explain the business impact. "an attacker can read any customer's invoices, including billing addresses, payment amounts, and line items" hits different than "idor on /api/invoices/:id."</p>
 
         <p>idor isn't going away. as long as apps have objects and users, there will be missing access checks. the hunters who find them consistently aren't the ones with the best tools — they're the ones who understand the application deeply enough to know where to look.</p>
-      </div>
-    </div>
-
-    <!-- POST: RECON -->
-    <div id="post-recon" class="page post-page">
-      <a href="#" class="back" onclick="show('posts',document.querySelector('nav a'));return false">&larr; back</a>
-      <h1>my recon methodology: from scope to first bug</h1>
-      <div class="meta">mar 22, 2026 &middot; 10 min read</div>
-      <div class="content">
-        <p>recon is the part that separates finding one bug from finding ten. most people jump straight into testing — i spend the first hours just mapping the target. the more surface you uncover, the more entry points you have.</p>
-
-        <p>here's the exact workflow i follow when i start a new program.</p>
-
-        <p><strong>1. subdomain enumeration</strong></p>
-
-        <p>start wide. pull subdomains from as many sources as possible and merge them:</p>
-
-<pre><span class="c"># passive enum from multiple sources</span>
-<span class="g">$</span> subfinder <span class="y">-d</span> target.com <span class="y">-o</span> subs_subfinder.txt
-<span class="g">$</span> amass enum <span class="y">-passive -d</span> target.com <span class="y">-o</span> subs_amass.txt
-<span class="g">$</span> github-subdomains <span class="y">-d</span> target.com <span class="y">-t</span> GITHUB_TOKEN <span class="y">-o</span> subs_github.txt
-
-<span class="c"># merge and deduplicate</span>
-<span class="g">$</span> cat subs_*.txt | sort <span class="y">-u</span> > all_subs.txt
-<span class="g">$</span> wc <span class="y">-l</span> all_subs.txt
-<span class="c"># 847 unique subdomains</span></pre>
-
-        <p>don't skip github dorking. you'd be surprised how many internal subdomains, staging environments, and api endpoints show up in public repos.</p>
-
-        <p><strong>2. probing live hosts</strong></p>
-
-        <p>not all subdomains resolve. filter for what's actually alive:</p>
-
-<pre><span class="g">$</span> cat all_subs.txt | httpx <span class="y">-silent -status-code -title -tech-detect</span> \
-  <span class="y">-o</span> live_hosts.txt
-
-<span class="c"># quick look at what we're dealing with</span>
-<span class="g">$</span> cat live_hosts.txt | grep <span class="y">"200"</span> | wc <span class="y">-l</span>
-<span class="c"># 312 live hosts returning 200</span></pre>
-
-        <p>httpx with <code>-tech-detect</code> is key — it tells you what stack each host runs. react frontend? spring backend? nginx? knowing the tech narrows your attack surface immediately.</p>
-
-        <p><strong>3. javascript analysis</strong></p>
-
-        <p>js files are a goldmine. they leak api endpoints, internal paths, tokens, and sometimes entire api schemas. pull them all and grep:</p>
-
-<pre><span class="c"># extract js urls from live hosts</span>
-<span class="g">$</span> cat live_hosts.txt | getJS <span class="y">--complete</span> | sort <span class="y">-u</span> > js_files.txt
-
-<span class="c"># download them all</span>
-<span class="g">$</span> cat js_files.txt | xargs <span class="y">-P 10 -I{}</span> wget <span class="y">-q</span> {} <span class="y">-P</span> js_downloads/
-
-<span class="c"># hunt for endpoints</span>
-<span class="g">$</span> grep <span class="y">-rhoP</span> '"/api/[a-zA-Z0-9_/]+"' js_downloads/ | sort <span class="y">-u</span>
-<span class="c"># /api/v1/users
-# /api/v1/admin/settings
-# /api/internal/debug
-# /api/v2/webhooks</span></pre>
-
-        <p><code>/api/internal/debug</code> — that shouldn't be there. those are the findings that make recon worth it.</p>
-
-        <p>also look for hardcoded keys and secrets:</p>
-
-<pre><span class="g">$</span> grep <span class="y">-rniE</span> "(api_key|apikey|secret|token|password|aws_)" js_downloads/
-<span class="g">$</span> nuclei <span class="y">-l</span> js_files.txt <span class="y">-t</span> exposures/tokens/</pre>
-
-        <p><strong>4. api discovery</strong></p>
-
-        <p>with the endpoints from js analysis, start building an api map. i usually check for openapi/swagger docs first:</p>
-
-<pre><span class="c"># common swagger/openapi paths</span>
-<span class="g">$</span> cat live_hosts.txt | while read host; do
-  for path in /swagger.json /openapi.json /api-docs /swagger-ui/ /docs; do
-    code=<span class="y">$(</span>curl <span class="y">-so /dev/null -w</span> "%{http_code}" <span class="y">$host$path</span><span class="y">)</span>
-    if [ <span class="y">"$code"</span> != <span class="y">"404"</span> ]; then
-      echo <span class="y">"$host$path [$code]"</span>
-    fi
-  done
-done</pre>
-
-        <p>finding a swagger doc is like finding the map to the treasure. every endpoint, every parameter, every model — documented.</p>
-
-        <p><strong>5. nuclei scan</strong></p>
-
-        <p>once you have your live hosts, run nuclei for quick wins:</p>
-
-<pre><span class="g">$</span> nuclei <span class="y">-l</span> live_hosts.txt \
-  <span class="y">-t</span> cves/ \
-  <span class="y">-t</span> vulnerabilities/ \
-  <span class="y">-t</span> exposures/ \
-  <span class="y">-t</span> misconfiguration/ \
-  <span class="y">-severity</span> medium,high,critical \
-  <span class="y">-o</span> nuclei_results.txt</pre>
-
-        <p>don't rely on nuclei alone — it catches known issues, not logic bugs. but it's a good first pass that can surface easy wins while you focus on manual testing.</p>
-
-        <p><strong>6. prioritize</strong></p>
-
-        <p>by now you have hundreds of hosts, endpoints, and js findings. the trick is knowing where to dig first:</p>
-
-        <p>— staging/dev environments often have weaker auth<br>
-        — admin panels exposed to the internet<br>
-        — api endpoints found in js but not in public docs<br>
-        — anything with <code>internal</code>, <code>debug</code>, or <code>legacy</code> in the path<br>
-        — endpoints that accept <code>org_id</code>, <code>user_id</code>, or <code>account_id</code> params</p>
-
-        <p>that last one is where most of my idor and bac findings come from. if an endpoint takes an id as input and returns data, test it with a different user's id. simple, effective, and still one of the most common bug classes out there.</p>
-
-        <p>recon isn't glamorous. it's running tools, reading output, connecting dots. but every serious bug i've found started with a good recon session. skip it and you're testing blind.</p>
       </div>
     </div>
 
@@ -1344,6 +1234,8 @@ done</pre>
 <span class="g">$</span> adb reboot</pre>
 
         <p>after reboot, mitmproxy's cert is trusted at the system level. apps that don't implement certificate pinning will now send all traffic through your proxy — no complaints.</p>
+
+        <p>one caveat: this system-cert method works on android 13 and below. on android 14+ the trust store moved into the conscrypt apex and <code>/system</code> is read-only under verity, so <code>adb remount</code> + pushing to <code>/system/etc/security/cacerts/</code> won't stick. on 14+ you either patch the apex cert store (rooted, more involved) or — usually easier — skip the system cert and use frida to disable pinning instead (covered in the jadx + frida post).</p>
 
         <p>for apps that do implement pinning, you'll need frida to bypass it (covered in the jadx + frida post). but the proxy setup stays the same.</p>
 
@@ -1446,7 +1338,11 @@ def request(flow: http.HTTPFlow):
   "events": ["payment.completed"]
 }</pre>
 
-        <p>if a low-priv user can read that secret, they can forge webhook payloads and trick the receiving server into processing fake events. that's a whole different class of attack.</p>
+        <p>if a low-priv user can read that signing secret, it's a different class of problem: the secret is what the <em>receiver</em> uses to verify a payload really came from the provider. with it, an attacker can forge validly-signed events and deliver them straight to the customer's endpoint, impersonating the provider — the receiver checks the signature, it matches, and it processes the fake event as real.</p>
+
+        <p><strong>the ssrf angle</strong></p>
+
+        <p>here's the part that's easy to miss on a webhook feature: the <em>destination</em> url is attacker-controlled, and the server is the thing that connects to it. that's a server-side request forgery sink handed to you by design. set (or hijack) a webhook url pointing at <code>http://169.254.169.254/latest/meta-data/</code> or an internal-only service, trigger the event, and the server makes the request for you. it's usually blind — you don't get the response back — but the server will happily deliver the event to an internal address, and timing or downstream side effects often confirm the reach. any webhook endpoint that accepts an arbitrary url without validating it against the private/reserved ranges (127/8, rfc1918, 169.254/16, 100.64/10, ipv4-mapped, ...) is an ssrf primitive sitting on top of the access-control bugs above.</p>
 
         <p>the fix is straightforward but rarely implemented correctly: every webhook operation should validate that the requesting user has the right role in the target organization. not just auth — <em>authorization</em>. most apps check the first, skip the second.</p>
       </div>

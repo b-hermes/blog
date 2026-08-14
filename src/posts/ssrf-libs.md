@@ -52,7 +52,7 @@ ssrfcheck.isSSRFSafeURL('http://localtest.me/')          -> safe: true
 ssrfcheck.isSSRFSafeURL('http://169-254-169-254.nip.io/') -> safe: true
 ```
 
-both of those names resolve to addresses you never want your server to reach (loopback, and cloud metadata). the guard looks at the string, sees a normal-looking hostname, and says fine. only *resolution* catches this — and resolution is step #2 that most of these libraries deliberately leave to you. (and even when you do resolve, some http clients skip resolution entirely for ip literals, so a resolver-based guard never runs at all.)
+both of those names resolve to addresses you never want your server to reach (loopback, and cloud metadata). the guard looks at the string, sees a normal-looking hostname, and says fine. only *resolution* catches this — and resolution is step #2 that most of these libraries deliberately leave to you. (and even when you do resolve, some http clients skip resolution entirely for ip literals, so a resolver-based guard never runs at all — [that trap, in node and rust](/posts/resolver-skip/).)
 
 ## and in kubernetes, the resolver rewrites your string
 

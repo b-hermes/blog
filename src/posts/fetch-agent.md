@@ -57,7 +57,7 @@ this isn't an exotic payload. it's a copy-paste. node 18 made `fetch` global, an
 your first instinct is "fine, give `fetch` a dispatcher instead of an agent." it's trickier than it looks, and i verified both traps:
 
 - **install `undici` and pass its `Agent` as `dispatcher` to the *global* `fetch`? doesn't work.** the global fetch uses node's *built-in* undici — a different module instance than the npm one — and mixing them throws `invalid onRequestStart`.
-- **a custom `connect.lookup` that validates the resolved ip misses ip literals.** undici skips dns resolution when the host is already an ip, so `http://127.0.0.1/` walks straight past a lookup-based guard. (that's its own bug, and it shows up identically in rust's `reqwest`.)
+- **a custom `connect.lookup` that validates the resolved ip misses ip literals.** undici skips dns resolution when the host is already an ip, so `http://127.0.0.1/` walks straight past a lookup-based guard. (that's its own bug, and it shows up identically in rust's `reqwest` — i dug into it in [the resolver-skip post](/posts/resolver-skip/).)
 
 ## the fix that actually works
 

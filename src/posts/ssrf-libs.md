@@ -1,5 +1,5 @@
 ---
-title: "does your ssrf guard resolve dns, or just regex your string?"
+title: "does your ssrf guard resolve dns, or just regex the string?"
 date: 2026-08-13
 readtime: "9 min read"
 description: "most ssrf guards just regex the hostname string. i threw a corpus of internal addresses at the popular npm libraries, then showed the two things a string check can never catch: dns resolution, and kubernetes search-domain expansion that turns a bare label into an internal service."

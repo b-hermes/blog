@@ -1,5 +1,5 @@
 ---
-title: "your ssrf guard's resolver doesn't run for ip literals (node + rust, same bug)"
+title: "127.0.0.1 never touches your resolver (node + rust)"
 date: 2026-08-13
 readtime: "7 min read"
 description: "hook the dns layer to block internal addresses and it feels airtight — every request resolves. except ip literals skip resolution entirely, so your resolver-based guard never runs. the same root cause in node's undici and rust's reqwest, with runnable repros."

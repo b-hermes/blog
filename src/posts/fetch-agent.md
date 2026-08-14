@@ -1,5 +1,5 @@
 ---
-title: "your ssrf filter's agent doesn't run: the fetch() footgun"
+title: "fetch() silently drops your ssrf agent"
 date: 2026-08-13
 readtime: "6 min read"
 description: "you wired an ssrf guard in as the http agent, tested it, shipped. but node's global fetch() silently ignores the agent option, so the filter never runs. why it happens, and the fix that actually works."
